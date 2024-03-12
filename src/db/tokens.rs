@@ -1,5 +1,5 @@
 use super::users::User;
-use crate::util::{sha256sum, uuid_string};
+use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta};
 use anyhow::anyhow;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
@@ -195,5 +195,48 @@ impl<'a> Tokens<'a> {
         } else {
             Ok(())
         }
+    }
+
+    /// List some of a user's tokens, with an adjustable page size.
+    pub async fn list(
+        &self,
+        user_id: i64,
+        page: u32,
+        size: u32,
+    ) -> anyhow::Result<(Vec<Token>, ListMeta)> {
+        // Get count first, as a separate query. For some reason sqlx tries
+        // by default to return the value of COUNT() as an i32, which I
+        // KNOW is not correct, so that column name with a colon overrides it
+        // at the sqlx layer. I think.
+        let count_res = query!(
+            r#"
+                SELECT COUNT(id) AS 'count: u32' FROM tokens WHERE user_id = ?;
+            "#,
+            user_id,
+        )
+        .fetch_one(self.pool)
+        .await?;
+        let count = count_res.count;
+        let offset = sqlite_offset(page, size)?;
+        // Then, get the page of results.
+        let list = query_as!(
+            Token,
+            r#"
+                SELECT id, user_id, scope, created, last_used, comment
+                FROM tokens
+                WHERE user_id = ?1
+                ORDER BY last_used DESC NULLS LAST, id DESC
+                LIMIT ?2
+                OFFSET ?3;
+            "#,
+            user_id,
+            size,
+            offset,
+        )
+        .fetch_all(self.pool)
+        .await?;
+        let meta = ListMeta { count, page, size };
+
+        Ok((list, meta))
     }
 }
