@@ -207,4 +207,20 @@ impl<'a> Users<'a> {
             Ok(())
         }
     }
+
+    pub async fn destroy(&self, id: i64) -> anyhow::Result<()> {
+        let res = query!(
+            r#"
+                DELETE FROM users WHERE id = ?;
+            "#,
+            id,
+        )
+        .execute(self.pool)
+        .await?;
+        if res.rows_affected() != 1 {
+            Err(anyhow!("Couldn't find the specified user."))
+        } else {
+            Ok(())
+        }
+    }
 }
