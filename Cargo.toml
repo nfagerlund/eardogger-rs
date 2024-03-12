@@ -6,3 +6,35 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Foundations:
+tokio = { version = "1.36.0", features = ["full"] }
+anyhow = "1.0.79"
+tracing = "0.1.40"
+serde = { version = "1", features = ["derive"] }
+
+# Database:
+sqlx = { version = "0.7.3", features = [
+    "sqlite",
+    "runtime-tokio",
+    "tls-rustls",
+    "time",
+] }
+time = "0.3.34"
+
+# Crypto/randomness/hashing/etc:
+rand = "0.8.5"
+bcrypt = "0.15.0"
+sha2 = "0.10.8"
+base16ct = { version = "0.2.0", features = ["std", "alloc"] }
+uuid = { version = "1.7.0", features = ["v4"] }
+
+# Website:
+axum = { version = "0.7.4" }
+tower-cookies = { version = "0.10.0", features = ["axum-core", "signed"] }
+tower-http = { version = "0.5.2", features = ["fs"] }
+busride-rs = { git = "https://github.com/nfagerlund/busride-rs", rev = "60ef295" }
+minijinja = "1.0.12"
+
+# Clean-up:
+clap = { version = "4.4.18", features = ["derive"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
