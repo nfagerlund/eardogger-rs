@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use regex::Regex;
-use sqlx::{query_as, SqlitePool};
+use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
 
 /// A query helper type for operating on [User]s. Usually you rent this from
@@ -139,5 +139,72 @@ impl<'a> Users<'a> {
             }
         }
         Ok(None)
+    }
+
+    /// Hard-set a user's password. Assumes you've already validated the inputs.
+    pub async fn set_password(&self, username: &str, new_password: &str) -> anyhow::Result<()> {
+        let password_hash = bcrypt::hash(new_password, 12)?;
+        let res = query!(
+            r#"
+                UPDATE users SET password_hash = ?1
+                WHERE username = ?2;
+            "#,
+            password_hash,
+            username,
+        )
+        .execute(self.pool)
+        .await?;
+        if res.rows_affected() != 1 {
+            Err(anyhow!("Couldn't find user with name {}.", username))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Authenticate a user's current password and then change it to a double-submitted
+    /// new password.
+    pub async fn change_password(
+        &self,
+        username: &str,
+        old_password: &str,
+        new_password: &str,
+        new_password_again: &str,
+    ) -> anyhow::Result<()> {
+        let old_password = valid_password(old_password)?;
+        let new_password = valid_password(new_password)?;
+        let new_password_again = valid_password(new_password_again)?;
+
+        if new_password != new_password_again {
+            return Err(anyhow!("New passwords didn't match."));
+        }
+
+        let Some(user) = self.authenticate(username, old_password).await? else {
+            return Err(anyhow!("Old password was wrong."));
+        };
+
+        self.set_password(&user.username, new_password).await
+    }
+
+    /// Set or clear the user's email. BTW, this and set_password take username
+    /// instead of ID in order to give better errors, since these errors
+    /// will definitely flow all the way up to the frontend.
+    pub async fn set_email(&self, username: &str, email: Option<&str>) -> anyhow::Result<()> {
+        let email = clean_email(email);
+
+        let res = query!(
+            r#"
+                UPDATE users SET email = ?1
+                WHERE username = ?2;
+            "#,
+            email,
+            username,
+        )
+        .execute(self.pool)
+        .await?;
+        if res.rows_affected() != 1 {
+            Err(anyhow!("Couldn't find user with name {}", username))
+        } else {
+            Ok(())
+        }
     }
 }
