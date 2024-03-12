@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users(
 CREATE TABLE IF NOT EXISTS tokens(
     id INTEGER PRIMARY KEY NOT NULL,
     user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    token_hash TEXT NOT NULL,
+    token_hash TEXT UNIQUE NOT NULL,
     scope TEXT NOT NULL,
     created TIMESTAMP NOT NULL DEFAULT current_timestamp,
     comment TEXT,
