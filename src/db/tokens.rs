@@ -81,6 +81,10 @@ impl From<TokenScope> for &'static str {
 }
 
 impl<'a> Tokens<'a> {
+    pub fn new(pool: &'a SqlitePool) -> Self {
+        Self { pool }
+    }
+
     /// Create a token, and return it along with the *actual token cleartext.*
     /// This is the only time the cleartext is ever available.
     pub async fn create(

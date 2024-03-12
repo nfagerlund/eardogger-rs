@@ -78,6 +78,10 @@ fn valid_password(password: &str) -> anyhow::Result<&str> {
 }
 
 impl<'a> Users<'a> {
+    pub fn new(pool: &'a SqlitePool) -> Self {
+        Self { pool }
+    }
+
     /// Create a new user account.
     pub async fn create(
         &self,
