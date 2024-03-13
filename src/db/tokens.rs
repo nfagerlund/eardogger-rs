@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
 
-/// A query helper type for operating on [Token]s. Usually rented from a Db.
+/// A query helper type for operating on [Token]s. Usually rented from a [Db].
 pub struct Tokens<'a> {
     pool: &'a SqlitePool,
 }
