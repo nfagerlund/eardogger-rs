@@ -3,6 +3,7 @@
 //! to a pool, and methods on Db that return those collections. So then it's
 //! like `db.users().create(...)`. Seems ok.
 mod auth_tests;
+mod sessions;
 mod tokens;
 mod users;
 use sqlx::SqlitePool;
