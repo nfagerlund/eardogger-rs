@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use rand::{thread_rng, RngCore};
 use sha2::{Digest, Sha256};
+use url::Url;
 
 /// Use the thread_rng CSPRNG to create a random UUID, formatted as a String.
 /// This ought to be mildly more efficient than hammering the OS random source.
@@ -56,4 +57,112 @@ pub fn sqlite_offset(page: u32, size: u32) -> anyhow::Result<i64> {
     size_i64.checked_mul(zero_idx_page_i64).ok_or_else(|| {
         anyhow!("Literally impossible, but apparently page * size overflowed an i64.")
     })
+}
+
+/// Trim any leading "m." or "www." subdomains off a hostname at the start
+/// of a string. (Generally you'll call this function with *most* of a URL,
+/// after first removing the scheme and the `://` separator.)
+fn trim_m_www(mut partial_url: &str) -> &str {
+    loop {
+        if partial_url.starts_with("m.") {
+            partial_url = &partial_url["m.".len()..];
+        } else if partial_url.starts_with("www.") {
+            partial_url = &partial_url["www.".len()..];
+        } else {
+            break;
+        }
+    }
+    partial_url
+}
+
+/// Validate that the input is an HTTP or HTTPS URL, then remove the scheme and
+/// the `://` separator. The result can be passed to [`trim_m_www`].
+fn check_and_trim_scheme(url: &str) -> anyhow::Result<&str> {
+    let Ok(parsed) = Url::parse(url) else {
+        return Err(anyhow!("Can't bookmark an invalid URL: {}", url));
+    };
+    let scheme = parsed.scheme();
+    if scheme == "http" || scheme == "https" {
+        let sliced = &url[scheme.len()..];
+        let sliced = &sliced["://".len()..];
+        Ok(sliced)
+    } else {
+        Err(anyhow!(
+            "Only http or https URLs are supported; we can't bookmark {}",
+            scheme
+        ))
+    }
+}
+
+/// Turn a given URL into a partial URL (path and hostname with
+/// any `m.` or `www.` subdomains trimmed) that can be comparied to a
+/// stored prefix string with a simple `matchable LIKE prefix || '%'`
+/// SQL expression (or a `.starts_with()` if you're in normal code).
+/// This also doubles as a check for valid input URLs.
+fn matchable_from_url(url: &str) -> anyhow::Result<&str> {
+    Ok(trim_m_www(check_and_trim_scheme(url)?))
+}
+
+/// Clean and normalize a provided prefix matcher string before persisting it.
+/// A cleaned prefix can reliably match the results of `matchable_from_url`.
+fn normalize_prefix_matcher(prefix: &str) -> &str {
+    // The input shouldn't have a URL scheme, so we normally expect to
+    // just eat this error. But if we *happen* to have an http(s) scheme,
+    // go ahead and trim it, since the user's intent was still clear.
+    let scheme_trimmed = match check_and_trim_scheme(prefix) {
+        Ok(s) => s,
+        Err(_) => prefix,
+    };
+    trim_m_www(scheme_trimmed)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::util::{normalize_prefix_matcher, trim_m_www};
+
+    use super::check_and_trim_scheme;
+
+    #[test]
+    fn m_and_www() {
+        assert_eq!(trim_m_www("m.example.com"), "example.com");
+        assert_eq!(trim_m_www("www.example.com"), "example.com");
+        assert_eq!(trim_m_www("m.www.example.com"), "example.com");
+        assert_eq!(trim_m_www("www.m.example.com"), "example.com");
+        assert_eq!(trim_m_www("somewhere.example.com"), "somewhere.example.com");
+    }
+
+    #[test]
+    fn scheme_trim() {
+        assert_eq!(
+            check_and_trim_scheme("https://example.com/comic").unwrap(),
+            "example.com/comic"
+        );
+        assert_eq!(
+            check_and_trim_scheme("http://example.com/comic").unwrap(),
+            "example.com/comic"
+        );
+        assert!(check_and_trim_scheme("noscheme.example.com/comic").is_err());
+        assert!(check_and_trim_scheme("ftp://example.com/comic.tgz").is_err());
+    }
+
+    #[test]
+    fn matcher_normalizing() {
+        assert_eq!(normalize_prefix_matcher("m.example.com"), "example.com");
+        assert_eq!(normalize_prefix_matcher("www.example.com"), "example.com");
+        assert_eq!(normalize_prefix_matcher("m.www.example.com"), "example.com");
+        assert_eq!(normalize_prefix_matcher("www.m.example.com"), "example.com");
+        assert_eq!(
+            normalize_prefix_matcher("somewhere.example.com"),
+            "somewhere.example.com"
+        );
+        assert_eq!(
+            normalize_prefix_matcher("http://www.m.example.com"),
+            "example.com"
+        );
+        // If you do this one, you just fucked up and need to fix it, we can't help ya:
+        assert_eq!(
+            normalize_prefix_matcher("ftp://www.m.example.com"),
+            "ftp://www.m.example.com"
+        );
+    }
 }
