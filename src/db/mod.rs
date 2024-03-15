@@ -7,6 +7,8 @@ mod dogears;
 mod sessions;
 mod tokens;
 mod users;
+use dogears::Dogears;
+use sessions::Sessions;
 use sqlx::SqlitePool;
 use tokens::Tokens;
 use users::Users;
@@ -40,5 +42,13 @@ impl Db {
 
     pub fn tokens(&self) -> Tokens {
         Tokens::new(&self.pool)
+    }
+
+    pub fn dogears(&self) -> Dogears {
+        Dogears::new(&self.pool)
+    }
+
+    pub fn sessions(&self) -> Sessions {
+        Sessions::new(&self.pool)
     }
 }

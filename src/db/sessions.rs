@@ -49,6 +49,10 @@ impl Session {
 }
 
 impl<'a> Sessions<'a> {
+    pub fn new(pool: &'a SqlitePool) -> Self {
+        Self { pool }
+    }
+
     /// Delete all expired sessions from the database. This is a low-priority
     /// cleanup operation that should happen as a background task rather than
     /// blocking a user request... but it should happen fairly often so the

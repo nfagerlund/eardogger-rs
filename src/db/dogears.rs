@@ -20,6 +20,10 @@ pub struct Dogear {
 
 // create, update, list, destroy, current_for_site
 impl<'a> Dogears<'a> {
+    pub fn new(pool: &'a SqlitePool) -> Self {
+        Self { pool }
+    }
+
     /// Make a new dogear!
     pub async fn create(
         &self,
