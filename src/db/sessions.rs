@@ -1,5 +1,6 @@
 use super::users::User;
 use crate::util::uuid_string;
+use anyhow::anyhow;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
 use tower_cookies::cookie::{Cookie, SameSite};
@@ -93,6 +94,25 @@ impl<'a> Sessions<'a> {
         .fetch_one(self.pool)
         .await
         .map_err(|e| e.into())
+    }
+
+    pub async fn destroy(&self, sessid: &str) -> anyhow::Result<()> {
+        let res = query!(
+            r#"
+                DELETE FROM sessions
+                WHERE id = ?;
+            "#,
+            sessid,
+        )
+        .execute(self.pool)
+        .await?;
+        if res.rows_affected() == 1 {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "Couldn't find the specified login session; you must have already logged out."
+            ))
+        }
     }
 
     /// Find the user and session for a given session ID (IF the session is
