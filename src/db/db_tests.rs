@@ -166,3 +166,57 @@ async fn token_create_auth_destroy() {
         .expect("shouldn't error");
     assert!(gone_auth.is_none());
 }
+
+#[tokio::test]
+async fn user_password_auth() {
+    let db = Db::new_test_db().await;
+    let users = db.users();
+
+    // basic peep
+    let user = users
+        .create("test_peep", "aoeuhtns", Some("nf@example.com"))
+        .await
+        .expect("usr create err");
+    assert_eq!(user.username, "test_peep");
+    assert_eq!(user.email.as_deref(), Some("nf@example.com"));
+    // No blank usernames
+    assert!(users.create("", "aoeua", None).await.is_err());
+    // No blank passwords (this is a change from eardogger 1, where that just disabled login)
+    assert!(users.create("", "", None).await.is_err());
+    // No spaces in username
+    assert!(users.create("space cadet", "aoeu", None).await.is_err());
+    // Space in pw ok tho
+    assert!(users
+        .create("spacecadet", " im in space", None)
+        .await
+        .is_ok());
+    assert!(users
+        .authenticate("spacecadet", " im in space")
+        .await
+        .expect("shouldn't error")
+        .is_some());
+    // Wrong password gets you nothin
+    assert!(users
+        .authenticate("spacecadet", "")
+        .await
+        .expect("shouldn't error")
+        .is_none());
+    // Authenticate trims space on username
+    assert!(users
+        .authenticate(" spacecadet ", " im in space")
+        .await
+        .expect("shouldn't error")
+        .is_some());
+    // Authenticate doesn't trim space on passwords
+    assert!(users
+        .authenticate("spacecadet", " im in space ")
+        .await
+        .expect("shouldn't error")
+        .is_none());
+    // Nonexistent user gets Ok(None), just like wrong pw.
+    assert!(users
+        .authenticate("blasecadet", "spaaaaace")
+        .await
+        .expect("shouldn't error")
+        .is_none());
+}
