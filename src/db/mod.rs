@@ -2,7 +2,7 @@
 //! of pluralized collection types (Users, etc.) that just hold a reference
 //! to a pool, and methods on Db that return those collections. So then it's
 //! like `db.users().create(...)`. Seems ok.
-mod auth_tests;
+mod db_tests;
 mod dogears;
 mod sessions;
 mod tokens;
