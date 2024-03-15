@@ -27,44 +27,6 @@ pub fn sha256sum(cleartext: &str) -> String {
     base16ct::lower::encode_string(&hash)
 }
 
-/// Mini trait for ways to hash and verify user login passwords.
-/// If I had a public API for this I'd probably want to make the error
-/// type generic, but I'm gonna just anyhow it.
-pub trait PasswordHasher {
-    fn hash(&self, password: &str) -> anyhow::Result<String>;
-    fn verify(&self, password: &str, hash: &str) -> anyhow::Result<bool>;
-}
-
-/// The normal hasher.
-#[derive(Clone, Copy, Debug)]
-pub struct RealPasswordHasher;
-impl PasswordHasher for RealPasswordHasher {
-    fn hash(&self, password: &str) -> anyhow::Result<String> {
-        bcrypt::hash(password, 12).map_err(|e| e.into())
-    }
-
-    fn verify(&self, password: &str, hash: &str) -> anyhow::Result<bool> {
-        bcrypt::verify(password, hash).map_err(|e| e.into())
-    }
-}
-
-/// NEVER USE THIS IN REAL CODE -- it only exists to speed up the tests.
-#[derive(Clone, Copy, Debug)]
-pub struct WorstPasswordHasher;
-impl PasswordHasher for WorstPasswordHasher {
-    fn hash(&self, password: &str) -> anyhow::Result<String> {
-        Ok(sha256sum(password))
-    }
-
-    fn verify(&self, password: &str, hash: &str) -> anyhow::Result<bool> {
-        if sha256sum(password) == hash {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-}
-
 /// Metadata about which fraction of a collection was returned by a
 /// list method, for building pagination affordances.
 #[derive(Clone, Copy)]

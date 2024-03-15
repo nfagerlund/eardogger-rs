@@ -4,13 +4,10 @@ use regex::Regex;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
 
-use crate::util::PasswordHasher;
-
 /// A query helper type for operating on [User]s. Usually you rent this from
 /// a [Db].
-pub struct Users<'a, H> {
+pub struct Users<'a> {
     pool: &'a SqlitePool,
-    password_hasher: H,
 }
 
 /// Record struct for user accounts.
@@ -81,15 +78,9 @@ fn valid_password(password: &str) -> anyhow::Result<&str> {
 }
 
 // create, authenticate, set_password, change_password, set_email, destroy
-impl<'a, H> Users<'a, H>
-where
-    H: PasswordHasher + Clone,
-{
-    pub fn new(pool: &'a SqlitePool, password_hasher: H) -> Self {
-        Self {
-            pool,
-            password_hasher,
-        }
+impl<'a> Users<'a> {
+    pub fn new(pool: &'a SqlitePool) -> Self {
+        Self { pool }
     }
 
     /// Create a new user account.

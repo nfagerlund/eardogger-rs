@@ -7,7 +7,6 @@ mod dogears;
 mod sessions;
 mod tokens;
 mod users;
-use crate::util::{PasswordHasher, RealPasswordHasher, WorstPasswordHasher};
 use dogears::Dogears;
 use sessions::Sessions;
 use sqlx::SqlitePool;
@@ -18,41 +17,27 @@ use users::Users;
 /// and you can use it to access all the various resource methods, namespaced
 /// for readability.
 #[derive(Clone)]
-pub struct Db<H> {
+pub struct Db {
     pool: SqlitePool,
-    password_hasher: H,
 }
 
-impl Db<RealPasswordHasher> {
+impl Db {
     /// yeah.
     pub fn new(pool: SqlitePool) -> Self {
-        Self {
-            pool,
-            password_hasher: RealPasswordHasher,
-        }
+        Self { pool }
     }
-}
 
-impl Db<WorstPasswordHasher> {
     pub async fn new_test_db() -> Self {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         sqlx::migrate!("./migrations")
             .run(&pool)
             .await
             .expect("sqlx-ploded during migrations");
-        Self {
-            pool,
-            password_hasher: WorstPasswordHasher,
-        }
+        Self::new(pool)
     }
-}
 
-impl<H> Db<H>
-where
-    H: PasswordHasher + Clone,
-{
-    pub fn users(&self) -> Users<H> {
-        Users::new(&self.pool, self.password_hasher.clone())
+    pub fn users(&self) -> Users {
+        Users::new(&self.pool)
     }
 
     pub fn tokens(&self) -> Tokens {
