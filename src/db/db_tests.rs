@@ -115,3 +115,54 @@ async fn session_lifetime_modifier() {
     assert!(new_delta > Duration::days(89));
     assert!(new_delta < Duration::days(91));
 }
+
+#[tokio::test]
+async fn token_create_auth_destroy() {
+    let db = Db::new_test_db().await;
+    let users = db.users();
+    let tokens = db.tokens();
+
+    // CREATE
+    let right_user = users
+        .create("rightTokenCreate", "password123", None)
+        .await
+        .expect("user create err");
+    let wrong_user = users
+        .create("wrongTokenCreate", "password456", None)
+        .await
+        .expect("user create err");
+    let (right_token, right_cleartext) = tokens
+        .create(right_user.id, TokenScope::WriteDogears, Some("comment"))
+        .await
+        .expect("token create err");
+    let (wrong_token, wrong_cleartext) = tokens
+        .create(wrong_user.id, TokenScope::WriteDogears, Some("nocomment"))
+        .await
+        .expect("token create err");
+    // IDs increment
+    assert_ne!(right_user.id, wrong_user.id);
+    assert_ne!(right_token.id, wrong_token.id);
+    // AUTH
+    let (auth_token, auth_user) = tokens
+        .authenticate(&right_cleartext)
+        .await
+        .expect("token auth err")
+        .expect("token auth none");
+    // got right token and user back
+    assert_eq!(auth_user.id, right_user.id);
+    assert_eq!(auth_token.id, right_token.id);
+    // DESTROY
+    let wrong_destroy = tokens.destroy(right_token.id, wrong_user.id).await;
+    assert!(wrong_destroy.is_err());
+    let right_destroy = tokens.destroy(right_token.id, right_user.id).await;
+    assert!(right_destroy.is_ok());
+    let huh_destroy = tokens.destroy(right_token.id, right_user.id).await;
+    // can't re-delete
+    assert!(huh_destroy.is_err());
+    // can't authenticate a destroyed token
+    let gone_auth = tokens
+        .authenticate(&right_cleartext)
+        .await
+        .expect("shouldn't error");
+    assert!(gone_auth.is_none());
+}
