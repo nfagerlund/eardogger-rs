@@ -80,6 +80,7 @@ impl From<TokenScope> for &'static str {
     }
 }
 
+// create, authenticate, destroy, list
 impl<'a> Tokens<'a> {
     pub fn new(pool: &'a SqlitePool) -> Self {
         Self { pool }

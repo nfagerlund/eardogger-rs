@@ -49,6 +49,7 @@ impl Session {
     }
 }
 
+// create, authenticate, destroy, delete_expired
 impl<'a> Sessions<'a> {
     pub fn new(pool: &'a SqlitePool) -> Self {
         Self { pool }

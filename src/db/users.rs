@@ -77,6 +77,7 @@ fn valid_password(password: &str) -> anyhow::Result<&str> {
     }
 }
 
+// create, authenticate, set_password, change_password, set_email, destroy
 impl<'a> Users<'a> {
     pub fn new(pool: &'a SqlitePool) -> Self {
         Self { pool }
