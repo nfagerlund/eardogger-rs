@@ -99,13 +99,13 @@ fn check_and_trim_scheme(url: &str) -> anyhow::Result<&str> {
 /// stored prefix string with a simple `matchable LIKE prefix || '%'`
 /// SQL expression (or a `.starts_with()` if you're in normal code).
 /// This also doubles as a check for valid input URLs.
-fn matchable_from_url(url: &str) -> anyhow::Result<&str> {
+pub fn matchable_from_url(url: &str) -> anyhow::Result<&str> {
     Ok(trim_m_www(check_and_trim_scheme(url)?))
 }
 
 /// Clean and normalize a provided prefix matcher string before persisting it.
 /// A cleaned prefix can reliably match the results of `matchable_from_url`.
-fn normalize_prefix_matcher(prefix: &str) -> &str {
+pub fn normalize_prefix_matcher(prefix: &str) -> &str {
     // The input shouldn't have a URL scheme, so we normally expect to
     // just eat this error. But if we *happen* to have an http(s) scheme,
     // go ahead and trim it, since the user's intent was still clear.
