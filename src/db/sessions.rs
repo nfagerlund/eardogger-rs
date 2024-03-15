@@ -1,6 +1,5 @@
 use super::users::User;
 use crate::util::uuid_string;
-use anyhow::anyhow;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
 use tower_cookies::cookie::{Cookie, SameSite};
