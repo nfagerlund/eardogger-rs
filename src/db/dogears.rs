@@ -85,4 +85,92 @@ impl<'a> Dogears<'a> {
             Ok(Some(res))
         }
     }
+
+    /// Given a URL and a user, return the currently bookmarked page on that site.
+    /// (or None.) This partially acknowledges the "overlapping prefixes" loophole
+    /// by returning the result with the *longest* matching prefix.
+    pub async fn current_for_site(
+        &self,
+        user_id: i64,
+        url: &str,
+    ) -> anyhow::Result<Option<String>> {
+        let matchable = matchable_from_url(url)?;
+        let res = query!(
+            r#"
+                SELECT current
+                FROM dogears
+                WHERE
+                    user_id = ?1 AND
+                    ?2 LIKE prefix || '%'
+                ORDER BY length(prefix) DESC
+                LIMIT 1;
+            "#,
+            user_id,
+            matchable,
+        )
+        .fetch_optional(self.pool)
+        .await?;
+        Ok(res.map(|r| r.current))
+    }
+
+    /// yeah
+    pub async fn destroy(&self, id: i64, user_id: i64) -> anyhow::Result<()> {
+        let res = query!(
+            r#"
+                DELETE FROM dogears
+                WHERE id = ?1 AND user_id = ?2;
+            "#,
+            id,
+            user_id,
+        )
+        .execute(self.pool)
+        .await?;
+        if res.rows_affected() == 1 {
+            Ok(())
+        } else {
+            Err(anyhow!("Couldn't find the specified dogear."))
+        }
+    }
+
+    /// List some of the user's dogears, with an adjustable page size.
+    pub async fn list(
+        &self,
+        user_id: i64,
+        page: u32,
+        size: u32,
+    ) -> anyhow::Result<(Vec<Dogear>, ListMeta)> {
+        // Count first, as a separate query. Note the sqlx "type coersion inside
+        // the column name" thing, sigh.
+        let count = query!(
+            r#"
+                SELECT count(id) AS 'count: u32' FROM dogears
+                WHERE user_id = ?;
+            "#,
+            user_id,
+        )
+        .fetch_one(self.pool)
+        .await?
+        .count;
+
+        let offset = sqlite_offset(page, size)?;
+        let meta = ListMeta { count, page, size };
+        let list = query_as!(
+            Dogear,
+            r#"
+                SELECT id, user_id, prefix, current, display_name, updated
+                FROM dogears
+                WHERE user_id = ?1
+                ORDER BY updated DESC
+                LIMIT ?2
+                OFFSET ?3;
+            "#,
+            user_id,
+            size,
+            offset,
+        )
+        .fetch_all(self.pool)
+        .await?;
+
+        Ok((list, meta))
+    }
 }
