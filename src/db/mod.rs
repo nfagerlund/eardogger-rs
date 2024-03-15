@@ -7,6 +7,7 @@ mod dogears;
 mod sessions;
 mod tokens;
 mod users;
+use crate::util::{PasswordHasher, RealPasswordHasher, WorstPasswordHasher};
 use dogears::Dogears;
 use sessions::Sessions;
 use sqlx::SqlitePool;
@@ -17,27 +18,52 @@ use users::Users;
 /// and you can use it to access all the various resource methods, namespaced
 /// for readability.
 #[derive(Clone)]
-pub struct Db {
+pub struct Db<H> {
     pool: SqlitePool,
+    password_hasher: H,
 }
 
-impl Db {
+impl Db<RealPasswordHasher> {
     /// yeah.
     pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            password_hasher: RealPasswordHasher,
+        }
     }
-
     pub async fn new_test_db() -> Self {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         sqlx::migrate!("./migrations")
             .run(&pool)
             .await
             .expect("sqlx-ploded during migrations");
-        Self::new(pool)
+        Self {
+            pool,
+            password_hasher: RealPasswordHasher,
+        }
     }
+}
 
-    pub fn users(&self) -> Users {
-        Users::new(&self.pool)
+// impl Db<WorstPasswordHasher> {
+//     pub async fn new_test_db() -> Self {
+//         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+//         sqlx::migrate!("./migrations")
+//             .run(&pool)
+//             .await
+//             .expect("sqlx-ploded during migrations");
+//         Self {
+//             pool,
+//             password_hasher: WorstPasswordHasher,
+//         }
+//     }
+// }
+
+impl<H> Db<H>
+where
+    H: PasswordHasher + Clone,
+{
+    pub fn users(&self) -> Users<H> {
+        Users::new(&self.pool, self.password_hasher.clone())
     }
 
     pub fn tokens(&self) -> Tokens {
