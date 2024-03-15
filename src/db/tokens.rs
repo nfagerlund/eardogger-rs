@@ -194,10 +194,10 @@ impl<'a> Tokens<'a> {
         )
         .execute(self.pool)
         .await?;
-        if res.rows_affected() != 1 {
-            Err(anyhow!("Couldn't find the specified token."))
-        } else {
+        if res.rows_affected() == 1 {
             Ok(())
+        } else {
+            Err(anyhow!("Couldn't find the specified token."))
         }
     }
 
@@ -212,17 +212,18 @@ impl<'a> Tokens<'a> {
         // by default to return the value of COUNT() as an i32, which I
         // KNOW is not correct, so that column name with a colon overrides it
         // at the sqlx layer. I think.
-        let count_res = query!(
+        let count = query!(
             r#"
                 SELECT COUNT(id) AS 'count: u32' FROM tokens WHERE user_id = ?;
             "#,
             user_id,
         )
         .fetch_one(self.pool)
-        .await?;
-        let count = count_res.count;
+        .await?
+        .count;
+
         let offset = sqlite_offset(page, size)?;
-        // Then, get the page of results.
+        let meta = ListMeta { count, page, size };
         let list = query_as!(
             Token,
             r#"
@@ -239,7 +240,6 @@ impl<'a> Tokens<'a> {
         )
         .fetch_all(self.pool)
         .await?;
-        let meta = ListMeta { count, page, size };
 
         Ok((list, meta))
     }
