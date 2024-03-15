@@ -31,6 +31,9 @@ impl Db<RealPasswordHasher> {
             password_hasher: RealPasswordHasher,
         }
     }
+}
+
+impl Db<WorstPasswordHasher> {
     pub async fn new_test_db() -> Self {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         sqlx::migrate!("./migrations")
@@ -39,24 +42,10 @@ impl Db<RealPasswordHasher> {
             .expect("sqlx-ploded during migrations");
         Self {
             pool,
-            password_hasher: RealPasswordHasher,
+            password_hasher: WorstPasswordHasher,
         }
     }
 }
-
-// impl Db<WorstPasswordHasher> {
-//     pub async fn new_test_db() -> Self {
-//         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-//         sqlx::migrate!("./migrations")
-//             .run(&pool)
-//             .await
-//             .expect("sqlx-ploded during migrations");
-//         Self {
-//             pool,
-//             password_hasher: WorstPasswordHasher,
-//         }
-//     }
-// }
 
 impl<H> Db<H>
 where
