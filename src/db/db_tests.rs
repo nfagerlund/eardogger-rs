@@ -1,11 +1,18 @@
 #![cfg(test)]
 //! This module collects a bunch of tests that slam the actual database, to
-//! verify expected application-level behaviors. Traditionally that's a fairly
-//! wasteful activity, but I think sqlite should make this a bit lighter weight
-//! than I'm used to it being.
+//! verify expected application-level behaviors. Traditionally that's a bit
+//! of a slog, but while running the migrations wastes a bit of time, at least
+//! sqlite makes it real easy to do the in-memory DB thing.
+//!
+//! These tests aren't quite as clutch now as they were in eardogger 1 --
+//! sqlx's type-checked query macros are honestly pretty game changing, and
+//! if you can get it to compile it's generally gonna work as expected.
+//! Still, porting the tests is a good way to verify that my port is accurate.
 
 use sqlx::query;
 use time::{Duration, OffsetDateTime};
+
+use crate::util::ListMeta;
 
 use super::dogears::*;
 use super::sessions::*;
@@ -219,4 +226,136 @@ async fn user_password_auth() {
         .await
         .expect("shouldn't error")
         .is_none());
+}
+
+#[tokio::test]
+async fn dogears() {
+    let db = Db::new_test_db().await;
+    let dogears = db.dogears();
+    let user = db.users().create("peep", "boop", None).await.unwrap();
+    let wrong_user = db.users().create("wrong", "bop", None).await.unwrap();
+
+    // New user, empty list.
+    let (list, meta) = dogears.list(user.id, 1, 50).await.expect("no err");
+    assert!(list.is_empty());
+    assert_eq!(
+        meta,
+        ListMeta {
+            count: 0,
+            page: 1,
+            size: 50
+        }
+    );
+
+    // CREATE:
+    let dogear = dogears
+        .create(
+            user.id,
+            "example.com/comic/",
+            "https://example.com/comic/240",
+            Some("Example Comic"),
+        )
+        .await
+        .expect("no err");
+    // exercise prefix normalization while I'm here
+    let second = dogears
+        .create(
+            user.id,
+            "http://www.example.com/story/",
+            "https://example.com/story/2",
+            None,
+        )
+        .await
+        .expect("no err");
+    assert_eq!(second.prefix.as_str(), "example.com/story/");
+    // Difference from eardogger 1: used to be able to omit `current` at
+    // db level, but not anymore.
+    let _third = dogears
+        .create(
+            user.id,
+            "example.com/extras/",
+            "http://example.com/extras/turnarounds",
+            None,
+        )
+        .await
+        .expect("no err");
+    // LIST: now there's three
+    let (list, meta) = dogears.list(user.id, 1, 50).await.expect("no err");
+    assert_eq!(list.len(), 3);
+    assert_eq!(meta.count, 3);
+    // Unrelated user: empty list still
+    let (list, _) = dogears.list(wrong_user.id, 1, 50).await.expect("no err");
+    assert_eq!(list.len(), 0);
+
+    // CURRENTLY
+    let earlier = &dogear.current;
+    // Difference from eardogger 1: Used to be able to check currently on a
+    // fragment of a URL, like "example.com/comic/2".
+    for &url in &[
+        "https://example.com/comic/1",
+        // misc schemes, non-signifying subdomains
+        "http://m.example.com/comic/4",
+        "https://www.example.com/comic/   ", // trailing whatever
+    ] {
+        let currently = dogears
+            .current_for_site(user.id, url)
+            .await
+            .expect("no err")
+            .expect("some");
+        assert_eq!(&currently, earlier);
+    }
+    // Non-matching URL:
+    assert!(dogears
+        .current_for_site(user.id, "https://example.com/commie")
+        .await
+        .expect("no err")
+        .is_none());
+
+    // UPDATE
+    // Difference from eardogger 1: used to strip whitespace from input URLs, but
+    // not anymore.
+    for &url in &[
+        "https://example.com/comic/241",
+        "https://m.example.com/comic/242",
+        "http://www.example.com/comic/243",
+    ] {
+        let updated = dogears
+            .update(user.id, url)
+            .await
+            .expect("no err")
+            .expect("some");
+        assert_eq!(updated.len(), 1);
+        assert_eq!(updated[0].current.as_str(), url);
+    }
+    // Non-matching url
+    assert!(dogears
+        .current_for_site(user.id, "https://example.com/com/not-dogeared")
+        .await
+        .expect("no err")
+        .is_none());
+    // Can't double-create an existing dogear.
+    // Difference from eardogger 1: this used to silently upsert on conflict.
+    // But, asking for all the extra info beyond current is pointless if you're
+    // throwing it away anyway, right? And I never gave an interface to explicitly
+    // *edit* a dogear. All told, it feels like a 2019 mis-design, so I'm undoing it.
+    assert!(dogears
+        .create(
+            user.id,
+            dogear.prefix.as_str(),
+            "http://example.com/comic/249",
+            None,
+        )
+        .await
+        .is_err());
+    let (list, _) = dogears.list(user.id, 1, 50).await.expect("no err");
+    // Unchanged:
+    assert_eq!(list.len(), 3);
+
+    // DESTROY
+    // safety switch: user_id needs to match
+    assert!(dogears.destroy(second.id, wrong_user.id).await.is_err());
+    assert!(dogears.destroy(second.id, user.id).await.is_ok());
+    // list shrinks
+    let (list, _) = dogears.list(user.id, 1, 50).await.expect("no err");
+    assert_eq!(list.len(), 2);
 }
