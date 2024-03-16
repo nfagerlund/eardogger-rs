@@ -1,5 +1,5 @@
 use super::users::User;
-use crate::util::uuid_string;
+use crate::util::{uuid_string, SESSION_COOKIE_NAME};
 use anyhow::anyhow;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
@@ -8,9 +8,7 @@ use tower_cookies::cookie::{Cookie, SameSite};
 /// The max duration a session cookie can idle between logins before
 /// it expires. Because of sqlite's phantom date/time types, this must
 /// be passed as a whole string param, not interpolated from an int.
-const SESSION_LIFETIME_MODIFIER: &'static str = "+90 days";
-/// The session cookie name. This is a pre-existing value from eardogger 1.
-pub const SESSION_COOKIE_NAME: &'static str = "eardogger.sessid";
+const SESSION_LIFETIME_MODIFIER: &str = "+90 days";
 
 /// A query helper type for operating on [Session]s. Usually rented from a [Db].
 pub struct Sessions<'a> {

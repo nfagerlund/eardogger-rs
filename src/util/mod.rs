@@ -3,6 +3,12 @@ use rand::{thread_rng, RngCore};
 use sha2::{Digest, Sha256};
 use url::Url;
 
+// Constants
+/// The session cookie name. This is a pre-existing value from eardogger 1.
+pub const SESSION_COOKIE_NAME: &str = "eardogger.sessid";
+pub const PAGE_DEFAULT_SIZE: u32 = 50;
+const PAGE_MAX_SIZE: u32 = 500;
+
 /// Use the thread_rng CSPRNG to create a random UUID, formatted as a String.
 /// This ought to be mildly more efficient than hammering the OS random source.
 /// Not that we especially care, probably!
@@ -36,9 +42,6 @@ pub struct ListMeta {
     pub size: u32,
 }
 
-const DEFAULT_PAGE_SIZE: u32 = 50;
-const MAX_PAGE_SIZE: u32 = 500;
-
 /// Given a (1-indexed) page and size, calculate an OFFSET value to pass
 /// to a sqlite query. Sqlite integers in sqlx are pretty much always i64,
 /// so this is messier than it feels like it wants to be.
@@ -46,12 +49,11 @@ pub fn sqlite_offset(page: u32, size: u32) -> anyhow::Result<i64> {
     let zero_idx_page = page
         .checked_sub(1)
         .ok_or_else(|| anyhow!("Invalid page number."))?;
-    if size > MAX_PAGE_SIZE {
+    if size > PAGE_MAX_SIZE {
         return Err(anyhow!("Requested page size is too large."));
     }
-    // These can't fail.
-    let size_i64: i64 = size.try_into()?;
-    let zero_idx_page_i64: i64 = zero_idx_page.try_into()?;
+    let size_i64: i64 = size.into();
+    let zero_idx_page_i64: i64 = zero_idx_page.into();
 
     // This also can't fail, with MAX_PAGE_SIZE set to 500.
     size_i64.checked_mul(zero_idx_page_i64).ok_or_else(|| {
@@ -77,7 +79,7 @@ fn trim_m_www(mut partial_url: &str) -> &str {
 
 /// Validate that the input is an HTTP or HTTPS URL, then remove the scheme and
 /// the `://` separator. The result can be passed to [`trim_m_www`].
-fn check_and_trim_scheme(url: &str) -> anyhow::Result<&str> {
+fn trim_and_check_scheme(url: &str) -> anyhow::Result<&str> {
     let Ok(parsed) = Url::parse(url) else {
         return Err(anyhow!("Can't bookmark an invalid URL: {}", url));
     };
@@ -100,7 +102,7 @@ fn check_and_trim_scheme(url: &str) -> anyhow::Result<&str> {
 /// SQL expression (or a `.starts_with()` if you're in normal code).
 /// This also doubles as a check for valid input URLs.
 pub fn matchable_from_url(url: &str) -> anyhow::Result<&str> {
-    Ok(trim_m_www(check_and_trim_scheme(url)?))
+    Ok(trim_m_www(trim_and_check_scheme(url)?))
 }
 
 /// Clean and normalize a provided prefix matcher string before persisting it.
@@ -109,7 +111,7 @@ pub fn normalize_prefix_matcher(prefix: &str) -> &str {
     // The input shouldn't have a URL scheme, so we normally expect to
     // just eat this error. But if we *happen* to have an http(s) scheme,
     // go ahead and trim it, since the user's intent was still clear.
-    let scheme_trimmed = match check_and_trim_scheme(prefix) {
+    let scheme_trimmed = match trim_and_check_scheme(prefix) {
         Ok(s) => s,
         Err(_) => prefix,
     };
@@ -120,7 +122,7 @@ pub fn normalize_prefix_matcher(prefix: &str) -> &str {
 mod tests {
     use crate::util::{normalize_prefix_matcher, trim_m_www};
 
-    use super::check_and_trim_scheme;
+    use super::trim_and_check_scheme;
 
     #[test]
     fn m_and_www() {
@@ -134,15 +136,15 @@ mod tests {
     #[test]
     fn scheme_trim() {
         assert_eq!(
-            check_and_trim_scheme("https://example.com/comic").unwrap(),
+            trim_and_check_scheme("https://example.com/comic").unwrap(),
             "example.com/comic"
         );
         assert_eq!(
-            check_and_trim_scheme("http://example.com/comic").unwrap(),
+            trim_and_check_scheme("http://example.com/comic").unwrap(),
             "example.com/comic"
         );
-        assert!(check_and_trim_scheme("noscheme.example.com/comic").is_err());
-        assert!(check_and_trim_scheme("ftp://example.com/comic.tgz").is_err());
+        assert!(trim_and_check_scheme("noscheme.example.com/comic").is_err());
+        assert!(trim_and_check_scheme("ftp://example.com/comic.tgz").is_err());
     }
 
     #[test]

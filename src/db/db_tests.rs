@@ -14,10 +14,7 @@ use time::{Duration, OffsetDateTime};
 
 use crate::util::ListMeta;
 
-use super::dogears::*;
-use super::sessions::*;
-use super::tokens::*;
-use super::users::*;
+use super::tokens::TokenScope;
 use super::Db;
 
 #[tokio::test]
@@ -142,7 +139,7 @@ async fn token_create_auth_destroy() {
         .create(right_user.id, TokenScope::WriteDogears, Some("comment"))
         .await
         .expect("token create err");
-    let (wrong_token, wrong_cleartext) = tokens
+    let (wrong_token, _) = tokens
         .create(wrong_user.id, TokenScope::WriteDogears, Some("nocomment"))
         .await
         .expect("token create err");
