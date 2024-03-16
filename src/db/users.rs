@@ -131,6 +131,15 @@ impl<'a> Users<'a> {
         .map_err(|e| e.into())
     }
 
+    /// Just fetch a user. Most app logic should use [`authenticate`] instead,
+    /// but this is nice to have in tests.
+    pub async fn by_name(&self, username: &str) -> anyhow::Result<Option<User>> {
+        Ok(self
+            .by_name_with_password_hash(username)
+            .await?
+            .map(|u| u.into()))
+    }
+
     /// Authenticate a user by username and password. Only returns Some if the
     /// user exists and the password matches.
     pub async fn authenticate(
@@ -227,5 +236,21 @@ impl<'a> Users<'a> {
         } else {
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clean_email;
+
+    #[test]
+    fn clean_email_test() {
+        assert_eq!(clean_email(None), None);
+        assert_eq!(
+            clean_email(Some("you@example.com")),
+            Some("you@example.com")
+        );
+        assert_eq!(clean_email(Some("me@example.com ")), Some("me@example.com"));
+        assert_eq!(clean_email(Some("")), None);
     }
 }

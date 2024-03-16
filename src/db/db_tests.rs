@@ -226,6 +226,45 @@ async fn user_password_auth() {
         .await
         .expect("shouldn't error")
         .is_none());
+
+    // EDIT PASSWORD
+    // news must match
+    assert!(users
+        .change_password(user.username.as_str(), "aoeuhtns", "snthueoa", "snthsnth")
+        .await
+        .is_err());
+    // ok, so:
+    assert!(users
+        .change_password(user.username.as_str(), "aoeuhtns", "snthueoa", "snthueoa")
+        .await
+        .is_ok());
+    // new pw works
+    assert!(users
+        .authenticate(user.username.as_str(), "snthueoa")
+        .await
+        .expect("no err")
+        .is_some());
+
+    // EDIT EMAIL
+    // blank same as none.
+    // Difference from eardogger 1: set_email used to return user, now it returns Result<()>.
+    for &(email, cleaned) in &[
+        (None, None),
+        (Some("newpeep@example.com"), Some("newpeep@example.com")),
+        (Some(""), None),
+    ] {
+        assert!(users.set_email(user.username.as_str(), email).await.is_ok());
+        assert_eq!(
+            users
+                .by_name(user.username.as_str())
+                .await
+                .expect("no err")
+                .expect("some")
+                .email
+                .as_deref(),
+            cleaned
+        );
+    }
 }
 
 #[tokio::test]
