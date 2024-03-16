@@ -29,7 +29,7 @@ pub fn sha256sum(cleartext: &str) -> String {
 
 /// Metadata about which fraction of a collection was returned by a
 /// list method, for building pagination affordances.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct ListMeta {
     pub count: u32,
     pub page: u32,

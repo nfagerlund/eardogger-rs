@@ -9,6 +9,7 @@ pub struct Dogears<'a> {
 }
 
 /// A record struct for user web serial bookmarks.
+#[derive(Debug)]
 pub struct Dogear {
     pub id: i64,
     pub user_id: i64,
