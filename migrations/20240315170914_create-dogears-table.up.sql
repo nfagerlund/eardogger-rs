@@ -4,5 +4,6 @@ CREATE TABLE IF NOT EXISTS dogears(
     prefix TEXT NOT NULL,
     current TEXT NOT NULL,
     display_name TEXT,
-    updated TIMESTAMP NOT NULL DEFAULT current_timestamp
+    updated TIMESTAMP NOT NULL DEFAULT current_timestamp,
+    UNIQUE (user_id, prefix) ON CONFLICT ROLLBACK
 );
