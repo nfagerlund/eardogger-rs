@@ -1,4 +1,4 @@
-use super::state::AppState;
+use super::state::DogState;
 use crate::db::{Db, Session, Token, User};
 use crate::util::COOKIE_SESSION;
 use axum::{
@@ -97,7 +97,7 @@ where
 /// Function middleware to validate a login session and make the logged-in user
 /// available to routes.
 pub async fn session_middleware(
-    State(state): State<AppState>,
+    State(state): State<DogState>,
     cookies: Cookies,
     mut request: Request,
     next: Next,
@@ -131,7 +131,7 @@ pub async fn session_middleware(
 /// header and make the token's user available to routes. This should only be applied
 /// to API routes, and it overrides the session user if both would have been present.
 pub async fn token_middleware(
-    State(state): State<AppState>,
+    State(state): State<DogState>,
     mut request: Request,
     next: Next,
 ) -> Response {
