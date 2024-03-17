@@ -4,8 +4,14 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 // Constants
-/// The session cookie name. This is a pre-existing value from eardogger 1.
-pub const SESSION_COOKIE_NAME: &str = "eardogger.sessid";
+/// The session cookie name. This is a pre-existing value from eardogger 1...
+/// not that those sessions will be valid anymore, but re-using it should help
+/// reduce junk cookie pollution. 👍🏼
+pub const COOKIE_SESSION: &str = "eardogger.sessid";
+/// The login form signed anti-CSRF cookie name. Most "plain" forms use
+/// an anti-CSRF token stored in the session, but the session doesn't exist
+/// until after you log in, so.
+pub const COOKIE_LOGIN_CSRF: &str = "eardogger.loginguard";
 pub const PAGE_DEFAULT_SIZE: u32 = 50;
 const PAGE_MAX_SIZE: u32 = 500;
 

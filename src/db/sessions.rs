@@ -1,5 +1,5 @@
 use super::users::User;
-use crate::util::{uuid_string, SESSION_COOKIE_NAME};
+use crate::util::{uuid_string, COOKIE_SESSION};
 use anyhow::anyhow;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
@@ -37,7 +37,7 @@ impl Session {
     /// Consume a session to bake a cookie.
     pub fn into_cookie(self) -> Cookie<'static> {
         let Self { id, expires, .. } = self;
-        Cookie::build((SESSION_COOKIE_NAME, id))
+        Cookie::build((COOKIE_SESSION, id))
             .expires(expires)
             .http_only(true)
             .secure(true)

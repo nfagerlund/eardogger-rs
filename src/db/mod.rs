@@ -7,11 +7,17 @@ mod dogears;
 mod sessions;
 mod tokens;
 mod users;
-use dogears::Dogears;
-use sessions::Sessions;
+use self::dogears::Dogears;
+use self::sessions::Sessions;
+use self::tokens::Tokens;
+use self::users::Users;
 use sqlx::SqlitePool;
-use tokens::Tokens;
-use users::Users;
+
+// Publicize the record types, they're the star of the show
+pub use self::dogears::Dogear;
+pub use self::sessions::Session;
+pub use self::tokens::Token;
+pub use self::users::User;
 
 /// The app's main database helper type. One of these goes in the app state,
 /// and you can use it to access all the various resource methods, namespaced
