@@ -23,7 +23,7 @@ use tower_cookies::Cookies;
 /// stored in a request extension by the auth middleware, and it's also
 /// available as an extractor.
 #[derive(Clone, Debug)]
-enum AuthAny {
+pub enum AuthAny {
     Session {
         user: Arc<User>,
         session: Arc<Session>,
@@ -37,9 +37,9 @@ enum AuthAny {
 /// Only available as an extractor, the info in here is sourced from an
 /// AuthAny::Session value if one exists in the request extensions.
 #[derive(Clone, Debug)]
-struct AuthSession {
-    user: Arc<User>,
-    session: Arc<Session>,
+pub struct AuthSession {
+    pub user: Arc<User>,
+    pub session: Arc<Session>,
 }
 
 // These extractors rely on the session and token middlewares being present in
