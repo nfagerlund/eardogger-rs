@@ -16,7 +16,7 @@ pub struct Sessions<'a> {
 }
 
 /// A record struct for user login sessions.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Session {
     /// An opaque, securely-random ID string (actually a UUIDv4). Stored as
     /// a cookie in the user's browser and used to look up the session from the db.
