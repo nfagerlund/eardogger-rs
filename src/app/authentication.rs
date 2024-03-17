@@ -1,10 +1,15 @@
+use super::state::AppState;
 use crate::db::{Db, Session, Token, User};
+use crate::util::COOKIE_SESSION;
 use axum::{
     async_trait,
-    extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
+    extract::{FromRequestParts, Request, State},
+    http::{header, request::Parts, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Response},
 };
 use std::sync::Arc;
+use tower_cookies::Cookies;
 
 // ok let's get our types in a row.
 // The db types all use String for text because that's what Sqlx demands,
@@ -73,4 +78,97 @@ where
     }
 }
 
-// So, about those middlewares...
+// So, about those middlewares... how's about a refresher.
+//
+// My auth middleware is deeply entangled with the way I store and authenticate
+// users, so there would be no point in making it redistributable. It's
+// the definition of bespoke!
+//
+// The simplest way to make non-redistributable middleware is with
+// from_fn_with_state(). You feed it an async fn that takes extractors
+// as arguments, the last extractor arg MUST consume the body, and the LAST
+// last arg is a Next fn.
+//
+// In my case, the session middleware will be applied to every route, but the
+// token one will only be applied to API routes. The token middleware expects
+// to run AFTER the session one, and will blow away the session user if a token
+// was actually provided.
+
+/// Function middleware to validate a login session and make the logged-in user
+/// available to routes.
+pub async fn session_middleware(
+    State(state): State<AppState>,
+    cookies: Cookies,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    // get sessid out of cookie
+    if let Some(sessid) = cookies.get(COOKIE_SESSION) {
+        match state.db.sessions().authenticate(sessid.value()).await {
+            Ok(maybe) => {
+                if let Some((session, user)) = maybe {
+                    // ok rad, do it
+                    request.extensions_mut().insert(AuthAny::Session {
+                        user: Arc::new(user),
+                        session: Arc::new(session.clone()),
+                    });
+                    // Update cookie with new expiration date...
+                    // tower_cookies will ship this on the outbound leg.
+                    cookies.add(session.into_cookie());
+                }
+            }
+            Err(e) => {
+                // If this hit a DB error, the site can't do much, so feel free to bail.
+                return db_error_response_tuple(e, state.config.is_prod).into_response();
+            }
+        }
+    }
+    // if we made it here, it's time to move on!
+    next.run(request).await
+}
+
+/// Function middleware to validate a token passed in the `Authorization: Bearer STUFF`
+/// header and make the token's user available to routes. This should only be applied
+/// to API routes, and it overrides the session user if both would have been present.
+pub async fn token_middleware(
+    State(state): State<AppState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    if let Some(auth_header) = request.headers().get(header::AUTHORIZATION) {
+        if let Ok(auth_val) = auth_header.to_str() {
+            if let Some(bearer_val) = auth_val.strip_prefix("Bearer ") {
+                // phew!!
+                let token_cleartext = bearer_val.trim();
+                match state.db.tokens().authenticate(token_cleartext).await {
+                    Ok(maybe) => {
+                        if let Some((token, user)) = maybe {
+                            // ok rad, do it! This will blow away the session user, if any.
+                            // (Token inclusion is a stronger intent than cookie presence.)
+                            request.extensions_mut().insert(AuthAny::Token {
+                                user: Arc::new(user),
+                                token: Arc::new(token),
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        // If this hit a DB error, the site can't do much, so feel free to bail.
+                        return db_error_response_tuple(e, state.config.is_prod).into_response();
+                    }
+                }
+            }
+        }
+    }
+    // Ok, carry on
+    next.run(request).await
+}
+
+/// Small helper to obscure DB error text from users in production.
+fn db_error_response_tuple(e: anyhow::Error, is_prod: bool) -> (StatusCode, String) {
+    let msg = if is_prod {
+        "Something's broken on the server, sorry!".to_string()
+    } else {
+        format!("DB error: {}", e)
+    };
+    (StatusCode::INTERNAL_SERVER_ERROR, msg)
+}
