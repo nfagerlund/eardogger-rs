@@ -1,0 +1,7 @@
+{# The error page. #}
+{# Context: common: Common, error_page: ErrorPage #}
+{% extends "_layout.html.j2" %}
+{% block body %}
+<p>Encountered an error: {{error_page.error}}</p>
+<p>Whatever you were hoping for, it looks like I can't do it.</p>
+{% endblock body %}
