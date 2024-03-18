@@ -1,6 +1,6 @@
 {# This fragment is meant to be embedded in the logged-in front page. #}
 {# Context: dogears_list: DogearsList #}
-{% from "macro_pagination.html.j2" import pagination_links %}
+{% from "macro.pagination.html.j2" import pagination_links %}
 <section class="dogears" id="dogears-fragment">
   {{ pagination_links(pagination=dogears_list.pagination, url="/", fragment_url="/fragments/dogears", fragment_element_id="dogears-fragment") }}
 
