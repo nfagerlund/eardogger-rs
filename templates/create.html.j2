@@ -1,0 +1,31 @@
+{# The create new dogear page. #}
+{# Context: common: Common, create_page: CreatePage #}
+{% extends "_layout.html.j2" %}
+{% block body %}
+<p>You haven't saved your place on this site before. Wanna start?</p>
+
+<p>Tell Eardogger how to recognize this site, and next time it can update your location with one click.
+  <button type="button" class="help-reveal" data-help-target="help-url-prefix">(huh?)</button>
+</p>
+
+<p id="help-url-prefix" class="help help-hidden">To figure out whether a page is part of this site, Eardogger checks the start of its URL.
+
+<br /><br />
+
+Usually you just want the domain, like <code>comic.example.com/</code>. But if the same domain hosts several different sites, include part of the path (like <code>example.com/some-comic</code>) so you can dogear them separately.</p>
+
+<form id="create-dogear" method="post" action="/mark">
+  <label for="display_name">Name of site (optional):</label>
+  <input name="display_name" autofocus type="text" maxlength="200" />
+
+  <label>Current page:</label>
+  <div class="mock-input">{{create_page.bookmarked_url}}</div>
+  <input name="current" type="hidden" value="{{create_page.bookmarked_url}}" />
+
+  <label for="prefix">These URLs always start with:</label>
+  <button type="button" id="change-prefix" style="display: none;">Customize</button>
+  <textarea name="prefix" type="text" maxlength="300" rows="2" cols="10">{{create_page.bookmarked_url}}</textarea>
+
+  <button type="submit" id="submit-dogear">Create new dogear</button>
+</form>
+{% endblock body %}
