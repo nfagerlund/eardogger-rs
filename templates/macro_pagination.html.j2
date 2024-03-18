@@ -1,0 +1,25 @@
+{% macro pagination_links(pagination, url, fragment_url, fragment_element_id) %}
+{% if pagination.total_pages > 1 %}
+  <nav class="pagination">
+    {% if pagination.prev_page %}
+      <a
+        class="pagination-link pagination-previous"
+        href="{{url}}?page={{pagination.prev_page}}{% if pagination.page_size %}&size={{pagination.page_size}}{% endif %}"
+        data-fragment-url="{{fragment_url}}?page={{pagination.prev_page}}{% if pagination.page_size %}&size={{pagination.page_size}}{% endif %}"
+        data-fragment-element-id="{{fragment_element_id}}"
+      >Previous</a>
+      —
+    {% endif %}
+    <span class="pagination-current">Page {{pagination.current_page}} of {{pagination.total_pages}}</span>
+    {% if pagination.next_page %}
+      —
+      <a
+        class="pagination-link pagination-next"
+        href="{{url}}?page={{pagination.next_page}}{% if pagination.page_size %}&size={{pagination.page_size}}{% endif %}"
+        data-fragment-url="{{fragment_url}}?page={{pagination.next_page}}{% if pagination.page_size %}&size={{pagination.page_size}}{% endif %}"
+        data-fragment-element-id="{{fragment_element_id}}"
+      >Next</a>
+    {% endif %}
+  </nav>
+{% endif %}
+{% endmacro %}
