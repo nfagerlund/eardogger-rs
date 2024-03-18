@@ -53,6 +53,11 @@ impl ListMeta {
         let total_pages = self.count.div_ceil(self.size);
         // page 0 isn't a thing:
         let current_page = self.page.max(1);
+        let page_size = if self.size == PAGE_DEFAULT_SIZE {
+            None
+        } else {
+            Some(self.size)
+        };
         let prev_page = if current_page == 1 {
             None
         } else {
@@ -66,6 +71,7 @@ impl ListMeta {
         };
         Pagination {
             current_page,
+            page_size,
             prev_page,
             next_page,
             total_pages,
@@ -78,6 +84,9 @@ impl ListMeta {
 /// page-turning controls in a template.
 pub struct Pagination {
     pub current_page: u32,
+    // The reason page_size is optional is so that you get cleaner URLs if
+    // you didn't override the default size.
+    pub page_size: Option<u32>,
     pub prev_page: Option<u32>,
     pub next_page: Option<u32>,
     pub total_pages: u32,
