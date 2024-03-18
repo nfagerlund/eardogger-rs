@@ -48,6 +48,40 @@ pub struct ListMeta {
     pub size: u32,
 }
 
+impl ListMeta {
+    fn to_pagination(&self) -> Pagination {
+        let total_pages = self.count.div_ceil(self.size);
+        let prev_page = if self.page <= 1 {
+            None
+        } else {
+            // Guardrail if you hacked the query param and paged past the end.
+            Some((self.page - 1).min(total_pages))
+        };
+        let next_page = if self.page >= total_pages {
+            None
+        } else {
+            Some(self.page + 1)
+        };
+        Pagination {
+            current_page: self.page,
+            prev_page,
+            next_page,
+            total_pages,
+            total_count: self.count,
+        }
+    }
+}
+
+/// Pagination details built from a ListMeta, useful when displaying
+/// page-turning controls in a template.
+pub struct Pagination {
+    pub current_page: u32,
+    pub prev_page: Option<u32>,
+    pub next_page: Option<u32>,
+    pub total_pages: u32,
+    pub total_count: u32,
+}
+
 /// Given a (1-indexed) page and size, calculate an OFFSET value to pass
 /// to a sqlite query. Sqlite integers in sqlx are pretty much always i64,
 /// so this is messier than it feels like it wants to be.
