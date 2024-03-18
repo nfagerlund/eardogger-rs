@@ -1,0 +1,18 @@
+{# This fragment is meant to be embedded in the account page. #}
+{# Context: tokens_list: TokensList #}
+{% from "macro_pagination.html.j2" import pagination_links %}
+<section id="tokens-fragment">
+  {{ pagination_links(pagination=tokens_list.pagination, url="/account", fragment_url="/fragments/tokens", fragment_element_id="tokens-fragment") }}
+  <ul id="tokens-list">
+    {% for token in tokens_list.tokens %}
+      <li class="token" data-token-id="{{token.id}}">
+        <span class="token-comment">{{token.comment}}</span>
+        <span class="token-last-used">Last used: {{token.last_used | default("never")}}</span>
+        <span class="token-created">Created: {{token.created}}</span>
+        <span class="token-scope">{{token.scope}}</span>
+        <button type="button" class="delete-button token-delete" data-token-id="{{token.id}}">Delete</button>
+      </li>
+    {% endfor %}
+  </ul>
+  {{ pagination_links(pagination=tokens_list.pagination, url="/account", fragment_url="/fragments/tokens", fragment_element_id="tokens-fragment") }}
+</section>
