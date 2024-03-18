@@ -1,0 +1,125 @@
+{# The install page. currently broken, pending bookmarklet features. #}
+{# Context: common: Common #}
+{% extends "_layout.html.j2" %}
+{% block body %}
+<h2 id="install">Install the Eardogger Bookmarklet(s)</h2>
+
+<p>Eardogger relies on a <strong>bookmarklet,</strong> which needs to be installed in your web browser.</p>
+
+<p>Bookmarklets are like simple browser extensions: when you activate them, they perform an action on whatever page you're currently viewing.</p>
+
+<p>Once you install Eardogger's <span class="cartouche">🐶 Mark my spot</span> bookmarklet, you can activate it on any site to save your place. It works on both mobile and desktop.</p>
+
+<nav class="tabs">
+  <a
+    href="#"
+    class="tab active"
+    id="tab-desktop-instructions"
+    data-target="tabbed-install-instructions"
+    data-show="desktop"
+  >Desktop</a>
+  <a
+    href="#"
+    class="tab"
+    id="tab-ios-instructions"
+    data-target="tabbed-install-instructions"
+    data-show="ios"
+  >iOS</a>
+  <a
+    href="#"
+    class="tab"
+    id="tab-android-instructions"
+    data-target="tabbed-install-instructions"
+    data-show="android"
+  >Android</a>
+</nav>
+
+<section class="tabbed-instructions" id="tabbed-install-instructions" data-show="desktop">
+  <h2 class="only desktop">Desktop Instructions</h2>
+  <h2 class="only ios">iOS Instructions (Safari)</h2>
+  <h2 class="only android">Android Instructions (Chrome)</h2>
+
+  <p class="only ios">First, use the share menu to add a new bookmark for <em>this install page.</em> Put it in the "Favorites" folder, and change its name to <span class="cartouche">🐶 Mark my spot</span>.</p>
+
+  <p class="only android">First, open Chrome's "…" menu and tap the star to add a new bookmark for <em>this install page.</em></p>
+
+  <p>
+    <span class="only desktop">First,</span>
+    <span class="only ios android">Next,</span>
+    click the button below to generate a personal bookmarklet. This bookmarklet contains a unique access token for updating your dogears. <button type="button" class="help-reveal" data-help-target="help-install-access-token">(huh?)</button>
+  </p>
+
+  <div id="help-install-access-token" class="help help-hidden">
+    <p>That means the bookmarklet itself is basically logged in as you, so you should handle it like a secret. But unlike a real login, it can only <em>update</em> your dogears; it can't view a list of your dogears or change your password.</p>
+
+    <p>You can generate as many bookmarklets as you need. If you've generated some that you aren't using anymore, you can revoke their tokens on your <a href="/account">account page</a>.</p>
+  </div>
+
+  <div id="generate-personal-bookmarklet-fragment">
+    {% if user %}
+      <button id="generate-personal-bookmarklet" type="button">Generate personal bookmarklet</button>
+    {% else %}
+      <p><span class="cartouche" style="display: inline-block;">(If you were logged in, this would be the "Generate" button.)</span></p>
+    {% endif %}
+
+    <p class="only desktop unready">Next, bookmark the link below! You can drag and drop it onto your bookmarks toolbar, or right-click it and select "bookmark."</p>
+
+    <p class="only ios android unready">Next, copy the big fugly URL below to your clipboard:</p>
+
+    <aside class="unready">(It'll appear here after you generate it.)</aside>
+
+    <p class="only ios unready">Finally, open your bookmarks and tap "edit". Find the bookmark you made earlier, and replace its URL with the URL you just copied.</p>
+
+    <p class="only android unready">Finally, open your bookmarks and find the bookmark you made earlier. Rename it to <span class="cartouche">🐶 Mark my spot</span>, and replace its URL with the URL you just copied.</p>
+  </div>
+
+  <h3>You're Ready to Go!</h3>
+
+  <p class="only desktop">To save your place on a site, just click the "🐶 Mark my spot" bookmarklet.</p>
+
+  <p class="only ios">To save your place on a site:</p>
+
+  <ul class="only ios">
+    <li>Tap the URL bar to reveal your "Favorites" bookmarks.</li>
+    <li>Tap the icon for <span class="cartouche">🐶 Mark my spot</span>.</li>
+  </ul>
+
+  <p class="only ios">If you chose to put the bookmarklet somewhere other than "Favorites", you can activate it from the main bookmarks list instead.</p>
+
+  <p class="only ios">If you use a browser other than Safari, the steps to install and use the bookmarklet will be a little different, but most iOS browsers seem to require the same pattern of "bookmark a random page, then replace the URL later" when installing bookmarklets.</p>
+
+  <p class="only android">To save your place on a site:</p>
+
+  <ul class="only android">
+    <li>Tap the location bar.</li>
+    <li>Start typing the words "Mark my spot", until the <span class="cartouche">🐶 Mark my spot</span> bookmarklet appears in the list of suggestions.</li>
+    <li>Tap the suggestion for <span class="cartouche">🐶 Mark my spot</span>.</li>
+  </ul>
+
+  <p class="only android">That's a bit strange, but for some reason Chrome doesn't let you activate bookmarklets by tapping them in the main bookmarks list; only location bar suggestions will work. Optionally, you can rename your bookmarklet to use a unique abbreviation, so you don't have to type as much to make it appear.</p>
+
+  <p class="only android">If you use a browser other than Chrome, the steps to install and use the bookmarklet will be a little different. I'm not an expert in Android browsers, but you can probably find decent instructions on your own.</p>
+
+  <h3>Bonus: <span class="cartouche">🐶 Where was I?</span></h3>
+
+  <p>Eardogger also supports an optional bookmarklet called <span class="cartouche">🐶 Where was I?</span>. When you activate it on a site that you've previously dogeared, it jumps directly to your saved location. Just saves a tiny bit of time if you left a tab open but then read further on your phone.</p>
+
+  <p>
+    You can install it the same way as the main bookmarklet; just follow the previous instructions, but use
+    <span class="only desktop">the link below</span>
+    <span class="only ios android">the URL below</span>
+    instead of the personal bookmarklet you generated above.
+  </p>
+
+  {# TODO: bookmarklet fragment!! #}
+  {#
+
+  {{> bookmarklet
+    bookmarklet=where
+    name="Where was I?"
+    id="where"
+  }}
+
+  #}
+</section>
+{% endblock body %}
