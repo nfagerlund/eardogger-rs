@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use rand::{thread_rng, RngCore};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use url::Url;
 
@@ -82,6 +83,7 @@ impl ListMeta {
 
 /// Pagination details built from a ListMeta, useful when displaying
 /// page-turning controls in a template.
+#[derive(Serialize)]
 pub struct Pagination {
     pub current_page: u32,
     // The reason page_size is optional is so that you get cleaner URLs if

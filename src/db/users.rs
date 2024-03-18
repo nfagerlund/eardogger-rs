@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::Serialize;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
 
@@ -11,7 +12,7 @@ pub struct Users<'a> {
 }
 
 /// Record struct for user accounts.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct User {
     pub id: i64, // Unfortunately,
     pub username: String,

@@ -1,5 +1,6 @@
 use crate::util::{matchable_from_url, normalize_prefix_matcher, sqlite_offset, ListMeta};
 use anyhow::anyhow;
+use serde::Serialize;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
 
@@ -9,7 +10,7 @@ pub struct Dogears<'a> {
 }
 
 /// A record struct for user web serial bookmarks.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Dogear {
     pub id: i64,
     pub user_id: i64,

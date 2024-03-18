@@ -1,6 +1,7 @@
 use super::users::User;
 use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta};
 use anyhow::anyhow;
+use serde::Serialize;
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
 
@@ -15,7 +16,7 @@ pub struct Tokens<'a> {
 /// or argon2. We still don't store the token cleartext itself, but we
 /// just hash it with plain old unsalted sha256. Sometimes the classics
 /// are best.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Token {
     pub id: i64,
     pub user_id: i64,
