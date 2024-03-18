@@ -51,19 +51,21 @@ pub struct ListMeta {
 impl ListMeta {
     fn to_pagination(&self) -> Pagination {
         let total_pages = self.count.div_ceil(self.size);
-        let prev_page = if self.page <= 1 {
+        // page 0 isn't a thing:
+        let current_page = self.page.max(1);
+        let prev_page = if current_page == 1 {
             None
         } else {
             // Guardrail if you hacked the query param and paged past the end.
-            Some((self.page - 1).min(total_pages))
+            Some((current_page - 1).min(total_pages))
         };
-        let next_page = if self.page >= total_pages {
+        let next_page = if current_page >= total_pages {
             None
         } else {
-            Some(self.page + 1)
+            Some(current_page + 1)
         };
         Pagination {
-            current_page: self.page,
+            current_page,
             prev_page,
             next_page,
             total_pages,
