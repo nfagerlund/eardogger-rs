@@ -1,0 +1,18 @@
+{# The logged-in front page. #}
+{# Context: common: Common, dogears_list: DogearsList #}
+{% extends "_layout.html.j2" %}
+{% block body %}
+{% include "fragment.dogears.html.j2" %}
+
+<h2>Manual mode</h2>
+
+<p>This was mostly for debugging, but you can still use it.</p>
+
+<h3>Dogear a page</h3>
+
+<form id="update-dogear">
+  <label for="current">URL:</label>
+  <input name="current" type="text" maxlength="300" />
+  <button type="submit" id="update-dogear">Mark my place</button>
+</form>
+{% endblock body %}
