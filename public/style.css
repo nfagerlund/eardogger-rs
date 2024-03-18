@@ -1,0 +1,381 @@
+/* Global styles */
+
+* {
+  box-sizing: border-box;
+}
+
+/* Vars */
+
+:root {
+  --color-background: #FFF8EB;
+  --color-text: #282828;
+  --color-link: #265c92;
+  --color-link-visited: #7244c8;
+  --color-link-hover: #5452ff;
+  --color-border: black;
+  --color-divider: lightgrey;
+  --color-shadow: grey;
+  --color-disabled: #888;
+  --color-danger: #f99;
+  --color-button: #e5e0ff;
+  --color-button-border: grey;
+  --measure-border-radius: 3px;
+  --measure-input-height: 28px;
+  --font-display: "Futura", "Helvetica Neue", helvetica, arial, sans-serif;
+  --font-text: "Avenir Next", "Avenir", "Candara", "Verdana", sans-serif;
+  --font-mono: "Courier Prime", "Courier", "Courier New", monospace;
+  /* still waitin on universal support for "system-ui", sigh. */
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+body {
+  font-family: var(--font-text);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  max-width: 70ch;
+  margin: 2em auto;
+  padding: 0 1em;
+}
+
+header, nav, footer, form, h1, h2, h3, h4, h5, h6, .dogears, .serial-name, .countdown {
+  font-family: var(--font-display);
+}
+
+footer {
+  margin-top: 50px;
+  padding-top: 25px;
+  border-top: 1px solid var(--color-divider);
+}
+
+li {
+  margin-bottom: 5px;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 1em;
+}
+
+form p {
+  font-family: var(--font-text);
+}
+
+aside {
+  margin: 1em;
+}
+
+summary {
+  cursor: pointer;
+}
+
+button {
+  font-size: 16px;
+  font-family: var(--font-display);
+  font-weight: normal;
+  color: var(--color-text);
+  border-radius: var(--measure-border-radius);
+  background-color: var(--color-button);
+  border: 1px solid var(--color-button-border);
+  cursor: pointer;
+}
+
+input, .mock-input, textarea {
+  display: block;
+  margin-bottom: 10px;
+  margin-top: 5px;
+  padding: 5px;
+  width: 100%;
+  border: 1px solid var(--color-button-border);
+  border-radius: var(--measure-border-radius);
+  font-size: 16px;
+}
+
+input, button {
+  height: var(--measure-input-height);
+}
+
+textarea {
+  font-family: var(--font-ui);
+  height: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mock-input {
+  font-family: var(--font-ui);
+  min-height: var(--measure-input-height);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* :read-only pseudo-class is in spec hell, alas. */
+.mock-input, input[type="text"].read-only, textarea.read-only {
+  color: var(--color-disabled);
+  background-color: inherit;
+}
+
+a {
+  color: var(--color-link);
+}
+
+a:visited {
+  color: var(--color-link-visited);
+}
+
+a:hover {
+  color: var(--color-link-hover);
+}
+
+form {
+  margin-bottom: 25px;
+  padding: 15px;
+  display: inline-block;
+  width: 100%;
+  border-radius: 7px;
+  border: 1px solid;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1em;
+}
+
+nav {
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+h1 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+form#logout {
+  border: none;
+  width: auto;
+  margin-bottom: 0;
+  margin-left: auto;
+  padding-right: 0;
+}
+
+.serial-name { /* on the marked page */
+  font-weight: bold;
+}
+
+/* Grid for dogear items */
+
+#dogears, #tokens-list {
+  padding-left: 0;
+}
+
+#dogears li, .token {
+  list-style: none;
+  display: grid;
+  grid-row-gap: 5px;
+  grid-column-gap: 5px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid;
+}
+
+#dogears li:last-child, .token:last-child {
+  border-bottom: 0;
+}
+
+#dogears li {
+  grid-template-columns: 1fr auto auto;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "link link delete"
+    "current date date";
+}
+
+#dogears li * {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+  max-width: 100%;
+}
+
+#dogears a { /* main link */
+  grid-area: link;
+  justify-self: self-start; /* no invisible click targets */
+}
+
+#dogears .delete-dogear {
+  grid-area: delete;
+  align-self: self-start;
+}
+
+/* Hide copy buttons by default */
+.copy-button {
+  display: none;
+}
+
+.copy-buttons-enabled .copy-button {
+  display: inline-block;
+}
+
+.delete-button {
+  max-width: 6em; /* that's a hack around inability to transition auto values. */
+  transition: max-width 1s linear, background-color .5s ease-out;
+  white-space: nowrap;
+  overflow-x: hidden;
+}
+
+.really-delete {
+  max-width: 16em;
+  background-color: var(--color-danger);
+}
+
+#dogears .current {
+  grid-area: current;
+}
+
+#dogears .date {
+  grid-area: date;
+}
+
+#dogears .current, #dogears .date,
+.token-scope, .token-created, .token-last-used {
+  font-size: smaller;
+  font-family: var(--font-text);
+  color: var(--color-disabled);
+}
+
+.token {
+  grid-template-columns: 1fr 1fr 1fr auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "comment comment comment delete"
+    "last last created created"
+    "scope scope scope scope"
+    ;
+}
+
+.token-comment { grid-area: comment; }
+.token-delete {
+  grid-area: delete;
+  align-self: center;
+}
+.token-scope { grid-area: scope; }
+.token-created {
+  grid-area: created;
+  justify-self: end;
+}
+.token-last-used { grid-area: last; }
+
+.columns {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1em;
+}
+
+.columns > * {
+  flex-basis: 230px;
+  flex-grow: 1;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  margin-top: -1px;
+}
+
+.tabs .tab {
+  padding: 1em;
+  margin: 0 .25em;
+  border-top-left-radius: 1em;
+  border-top-right-radius: .5em;
+  border-color: var(--color-border);
+  border-style: solid;
+  border-width: 1px 1px 0 1px;
+  text-decoration: none;
+  color: var(--color-text);
+  background-color: var(--color-button);
+}
+
+.tabs .tab.active {
+  background-color: transparent;
+  text-decoration: underline;
+  box-shadow: 0 0 .5em var(--color-shadow);
+}
+
+.tabs {
+  margin-top: 1em;
+  padding-top: .5em;
+  overflow-y: hidden; /* No box-shadow on bottom, this way. */
+  border-bottom: 1px var(--color-border) solid;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tabbed-instructions[data-show="desktop"] .only:not(.desktop),
+.tabbed-instructions[data-show="ios"]     .only:not(.ios),
+.tabbed-instructions[data-show="android"] .only:not(.android) {
+  display: none;
+}
+
+.unready {
+  opacity: 0.5;
+}
+
+.cartouche {
+	border: 1px var(--color-border) solid;
+	padding: .1em .3em;
+	border-radius: var(--measure-border-radius);
+}
+
+/* Be good on smalls */
+@media screen and (max-width: 400px) {
+  body {
+    margin: 1em 0;
+  }
+
+  #dogears li {
+    grid-template-rows: 1fr auto auto;
+    grid-template-areas:
+      "link link        delete"
+      "current current current"
+      "date      date     date";
+  }
+}
+
+#countdown {
+  font-size: 2em;
+  font-weight: bold;
+}
+
+.help, aside {
+  font-size: smaller;
+}
+
+.help-hidden {
+  display: none;
+}
+
+.help-reveal {
+  transition: transform ease-in 0.25s;
+}
+
+.help-reveal-active {
+  transform: rotate(180deg);
+}
+
+@keyframes rotation {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(359deg);
+  }
+}
+
+.busy-fetching::after {
+  content: "🐶";
+  display: inline-block;
+  animation: rotation 2s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
