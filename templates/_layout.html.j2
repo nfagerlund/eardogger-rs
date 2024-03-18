@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>{{common.title}} — EARDOGGER</title>
+    <meta name="description" content="A tool for marking your place when you read serialized stuff on the web.">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="/style.css">
+
+    <script src="/client.js" async></script>
+  </head>
+  <body>
+    <header>
+      <h1>
+        {{common.title}}
+      </h1>
+
+      {% if common.user %}
+        <form id="logout" action="/logout" method="post">
+          {{common.user.username}}
+          <button type="submit">Log out</button>
+        </form>
+      {% endif %}
+    </header>
+
+    <nav>
+      <a href="/">Home</a> | <a href="/install">Install</a> | <a href="/faq">About</a>{% if common.user %} | <a href="/account">Account</a>{% endif %}
+    </nav>
+
+    <main>{% block body %}{% endblock body %}</main>
+
+    <footer>
+      <p>🐣 This fluffy baby chick was hatched on <a href="https://glitch.com">Glitch dot com</a>.</p>
+      <p>&copy; Nick Fagerlund, 2019 — present. Find me at <a href="https://github.com/nfagerlund/">🐙</a> • <a href="https://roadrunnertwice.dreamwidth.org">🌀</a> • <a href="https://mastodon.social/@nfagerlund">🐘</a> • <a href="https://twitter.com/nfagerlund">🦜</a></p>
+    </footer>
+
+  </body>
+</html>
