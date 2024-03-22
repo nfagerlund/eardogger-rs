@@ -1,3 +1,4 @@
 /target
 .env
 *.db*
+cookie_key.bin
