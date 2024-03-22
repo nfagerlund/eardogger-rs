@@ -49,6 +49,12 @@ struct CreatePage<'a> {
     bookmarked_url: &'a str,
 }
 
+#[derive(Serialize)]
+struct LoginPage<'a> {
+    return_to: &'a str,
+    previously_failed: bool,
+}
+
 // This one's kind of silly, but my theory is that I'll benefit if everything
 // *inside* the freeform context has a known type.
 #[derive(Serialize)]

@@ -1,10 +1,16 @@
 {# The login page. #}
-{# Context: common: Common #}
+{# Context: common: Common, login_page: LoginPage #}
 {% extends "_layout.html.j2" %}
 {% block body %}
 <p>Eardogger is a bookmarking tool for reading webcomics, books, and other kinds of Long Stuff on the web. Resume where you paused last time, read a little further, and save your new place with one click. It's nice.</p>
 
 <h2>Log In</h2>
+
+{% if login_page.previously_failed %}
+<div class="cartouche">
+    <p>Login failed — couldn't find that username or password. Try again, maybe.</p>
+</div>
+{% endif %}
 
 <form action="/login" method="post">
   <label for="username">Username</label>
@@ -12,6 +18,9 @@
 
   <label for="password">Password</label>
   <input type="password" id="password" name="password" />
+
+  <input type="hidden" name="login_csrf_token" value="{{common.csrf_token}}" />
+  <input type="hidden" name="return_to" value="{{login_page.return_to}}" />
 
   <button type="submit">Log in</button>
 </form>
