@@ -19,47 +19,47 @@ use serde::Serialize;
 /// is free to use anything in here, as are any nested pages. Haven't decided
 /// about fragments yet.
 #[derive(Serialize)]
-struct Common<'a> {
-    title: &'a str,
-    user: Option<&'a User>,
-    csrf_token: &'a str,
+pub struct Common<'a> {
+    pub title: &'a str,
+    pub user: Option<&'a User>,
+    pub csrf_token: &'a str,
 }
 
 #[derive(Serialize)]
-struct TokensList<'a> {
-    tokens: &'a [Token],
-    pagination: Pagination,
+pub struct TokensList<'a> {
+    pub tokens: &'a [Token],
+    pub pagination: Pagination,
 }
 
 #[derive(Serialize)]
-struct DogearsList<'a> {
-    dogears: &'a [Dogear],
-    pagination: Pagination,
+pub struct DogearsList<'a> {
+    pub dogears: &'a [Dogear],
+    pub pagination: Pagination,
 }
 
 #[derive(Serialize)]
-struct MarkedPage<'a> {
-    updated_dogears: &'a [Dogear],
-    bookmarked_url: &'a str,
-    slowmode: bool,
+pub struct MarkedPage<'a> {
+    pub updated_dogears: &'a [Dogear],
+    pub bookmarked_url: &'a str,
+    pub slowmode: bool,
 }
 
 #[derive(Serialize)]
-struct CreatePage<'a> {
-    bookmarked_url: &'a str,
+pub struct CreatePage<'a> {
+    pub bookmarked_url: &'a str,
 }
 
 #[derive(Serialize)]
-struct LoginPage<'a> {
-    return_to: &'a str,
-    previously_failed: bool,
+pub struct LoginPage<'a> {
+    pub return_to: &'a str,
+    pub previously_failed: bool,
 }
 
 // This one's kind of silly, but my theory is that I'll benefit if everything
 // *inside* the freeform context has a known type.
 #[derive(Serialize)]
-struct ErrorPage<'a> {
-    error: &'a str,
+pub struct ErrorPage<'a> {
+    pub error: &'a str,
 }
 
 // TODO still: bookmarklets.
