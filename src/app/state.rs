@@ -26,7 +26,11 @@ pub struct DogConfig {
 }
 
 impl DSInner {
-    fn render_view<S: Serialize>(&self, name: &str, ctx: S) -> Result<String, minijinja::Error> {
+    pub fn render_view<S: Serialize>(
+        &self,
+        name: &str,
+        ctx: S,
+    ) -> Result<String, minijinja::Error> {
         self.templates.get_template(name)?.render(ctx)
     }
 }
