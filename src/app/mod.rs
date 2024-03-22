@@ -1,11 +1,12 @@
 mod authentication;
 mod routes;
-mod state;
+pub mod state;
 mod templates;
 mod web_result;
 
-use self::authentication::session_middleware;
-use self::state::DogState;
+use authentication::session_middleware;
+use state::DogState;
+pub use templates::load_templates;
 
 use axum::{
     middleware::from_fn_with_state,
