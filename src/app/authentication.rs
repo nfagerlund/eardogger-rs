@@ -63,7 +63,7 @@ where
 {
     type Rejection = (StatusCode, &'static str);
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         match parts.extensions.get::<AuthAny>() {
             Some(aa) => Ok(aa.clone()),
             None => Err((StatusCode::UNAUTHORIZED, "Either you aren't logged in, you forgot to pass a token, or your token is no longer valid.")),
@@ -78,7 +78,7 @@ where
 {
     type Rejection = (StatusCode, &'static str);
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         if let Some(AuthAny::Session { user, session }) = parts.extensions.get::<AuthAny>() {
             Ok(AuthSession {
                 user: user.clone(),
