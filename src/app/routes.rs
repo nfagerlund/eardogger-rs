@@ -22,7 +22,7 @@ struct PaginationQuery {
 
 /// The home page! Shows your dogears list if logged in, and the login
 /// form if not.
-async fn root(
+pub async fn root(
     State(state): State<DogState>,
     Path(path): Path<String>,
     Query(query): Query<PaginationQuery>,
@@ -62,7 +62,7 @@ struct LoginParams {
 /// The form also includes a random token to be used in a signed double-submit
 /// CSRF-prevention scheme; compare it to the cookie to validate that the post came
 /// from a real login form, not a remote-site forgery.
-async fn post_login(
+pub async fn post_login(
     State(state): State<DogState>,
     cookies: Cookies,
     Form(params): Form<LoginParams>,
