@@ -42,6 +42,18 @@ pub struct AuthSession {
     pub session: Arc<Session>,
 }
 
+impl AuthSession {
+    /// A little helper to build common template args, give that most of it
+    /// is loaned out of the auth session anyway.
+    pub fn common_args<'a>(&'a self, title: &'a str) -> super::templates::Common<'a> {
+        super::templates::Common {
+            title,
+            user: Some(&*self.user),
+            csrf_token: &self.session.csrf_token,
+        }
+    }
+}
+
 // These extractors rely on the session and token middlewares being present in
 // the stack. If they're not around, it always whiffs.
 #[async_trait]
