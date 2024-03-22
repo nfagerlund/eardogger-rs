@@ -2,12 +2,11 @@ use super::authentication::AuthSession;
 use super::state::DogState;
 use super::templates::*;
 use super::web_result::{WebError, WebResult};
-use crate::util::{uuid_string, ListMeta, COOKIE_LOGIN_CSRF, PAGE_DEFAULT_SIZE};
+use crate::util::{uuid_string, COOKIE_LOGIN_CSRF, PAGE_DEFAULT_SIZE};
 
-use axum::extract::{Path, Query};
 use axum::{
-    extract::{Form, State},
-    http::StatusCode,
+    extract::{Form, Query, State},
+    http::{StatusCode, Uri},
     response::{Html, Redirect},
 };
 use minijinja::context;
@@ -24,13 +23,14 @@ pub struct PaginationQuery {
 /// form if not.
 pub async fn root(
     State(state): State<DogState>,
-    Path(path): Path<String>,
+    uri: Uri,
     Query(query): Query<PaginationQuery>,
     cookies: Cookies,
     maybe_auth: Option<AuthSession>,
 ) -> WebResult<Html<String>> {
     // Branch to login form, maybe
     let Some(auth) = maybe_auth else {
+        let path = uri.to_string();
         return login_form(state, cookies, &path).await;
     };
 
