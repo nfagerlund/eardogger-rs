@@ -1,8 +1,10 @@
+use super::authentication::AuthSession;
 use super::state::DogState;
 use super::templates::*;
 use super::web_result::{WebError, WebResult};
-use crate::util::{uuid_string, COOKIE_LOGIN_CSRF};
+use crate::util::{uuid_string, ListMeta, COOKIE_LOGIN_CSRF, PAGE_DEFAULT_SIZE};
 
+use axum::extract::{Path, Query};
 use axum::{
     extract::{Form, State},
     http::StatusCode,
@@ -11,6 +13,41 @@ use axum::{
 use minijinja::context;
 use serde::Deserialize;
 use tower_cookies::{Cookie, Cookies};
+
+#[derive(Deserialize)]
+struct PaginationQuery {
+    page: Option<u32>,
+    size: Option<u32>,
+}
+
+/// The home page! Shows your dogears list if logged in, and the login
+/// form if not.
+async fn root(
+    State(state): State<DogState>,
+    Path(path): Path<String>,
+    Query(query): Query<PaginationQuery>,
+    cookies: Cookies,
+    maybe_auth: Option<AuthSession>,
+) -> WebResult<Html<String>> {
+    // Branch to login form, maybe
+    let Some(auth) = maybe_auth else {
+        return login_form(state, cookies, &path).await;
+    };
+
+    let page = query.page.unwrap_or(1);
+    let size = query.size.unwrap_or(PAGE_DEFAULT_SIZE);
+    let (dogears, meta) = state.db.dogears().list(auth.user.id, page, size).await?;
+    let title = format!("{}'s Dogears", &auth.user.username);
+
+    let common = auth.common_args(&title);
+    let dogears_list = DogearsList {
+        dogears: &dogears,
+        pagination: meta.to_pagination(),
+    };
+    let ctx = context! {common, dogears_list};
+
+    Ok(Html(state.render_view("index.html.j2", ctx)?))
+}
 
 #[derive(Deserialize)]
 struct LoginParams {
