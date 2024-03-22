@@ -1,14 +1,16 @@
 use super::state::DogState;
+use super::templates::*;
 use super::web_result::{WebError, WebResult};
-use crate::util::COOKIE_LOGIN_CSRF;
+use crate::util::{uuid_string, COOKIE_LOGIN_CSRF};
 
 use axum::{
     extract::{Form, State},
     http::StatusCode,
     response::{Html, Redirect},
 };
+use minijinja::context;
 use serde::Deserialize;
-use tower_cookies::Cookies;
+use tower_cookies::{Cookie, Cookies};
 
 #[derive(Deserialize)]
 struct LoginParams {
@@ -75,6 +77,38 @@ async fn post_login(
     // TODO: I want to propagate the "last failed state" if you end up
     // redirecting and then it shows the login page again, but I'm still
     // mulling how to do that reliably. First thing that occurred to me was
-    // a query param, but I don't love it.
+    // a query param, but I don't love it. Guess I could use a cookie too :thonk:
     Ok(Redirect::to(redirect_to.as_str()))
+}
+
+/// Render the login form, including the anti-CSRF double-submit cookie.
+/// Notably, this is NOT a Handler fn! Since many routes can fall back
+/// to the login form, the idea is to just return an awaited call to
+/// login_form if they hit that branch.
+async fn login_form(state: DogState, cookies: Cookies, return_to: &str) -> WebResult<Html<String>> {
+    let csrf_token = uuid_string();
+    // Render the html string first, so we can get some use out of the owned string
+    // before consuming it to build the cookie. 👍🏼
+    let login_page = LoginPage {
+        return_to,
+        previously_failed: false, // TODO
+    };
+    let common = Common {
+        title: "Welcome to Eardogger",
+        user: None,
+        csrf_token: &csrf_token,
+    };
+    let ctx = context! { login_page, common };
+    let page = state.render_view("login.html.j2", ctx)?;
+
+    // no expires (session cookie)
+    // no http_only (owasp says don't?)
+    let csrf_cookie = Cookie::build((COOKIE_LOGIN_CSRF, csrf_token))
+        .secure(true)
+        .same_site(tower_cookies::cookie::SameSite::Strict)
+        .build()
+        .into_owned();
+    cookies.signed(&state.cookie_key).add(csrf_cookie);
+
+    Ok(Html(page))
 }
