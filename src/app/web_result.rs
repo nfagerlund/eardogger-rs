@@ -41,6 +41,12 @@ pub struct WebError {
 /// an error page, from a route.
 pub type WebResult<T> = Result<T, WebError>;
 
+impl WebError {
+    pub fn new(status: StatusCode, message: String) -> Self {
+        Self { message, status }
+    }
+}
+
 impl<E: Error> From<E> for WebError {
     // Build an html-fragment description of the error, to be included
     // in an error page later.
