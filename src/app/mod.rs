@@ -13,6 +13,7 @@ use axum::{
     Router,
 };
 use tower_cookies::CookieManagerLayer;
+use tower_http::services::ServeDir;
 
 /// Return a fully-functional eardogger app! The caller is in charge of building
 /// the state, but we DO need it here in order to construct our auth middleware,
@@ -24,5 +25,7 @@ pub fn eardogger_app(state: DogState) -> Router {
         .route("/login", post(routes::post_login))
         .layer(session_auth)
         .layer(CookieManagerLayer::new())
+        // put static files outside the auth layers
+        .nest_service("/public", ServeDir::new(&state.config.assets_dir))
         .with_state(state)
 }

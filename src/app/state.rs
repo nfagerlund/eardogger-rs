@@ -23,6 +23,8 @@ pub struct DogConfig {
     pub is_prod: bool,
     /// The site's own base URL.
     pub own_origin: Url,
+    /// The directory with static CSS/JS/image assets.
+    pub assets_dir: String,
 }
 
 impl DSInner {
