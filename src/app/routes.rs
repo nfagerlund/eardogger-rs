@@ -15,9 +15,9 @@ use serde::Deserialize;
 use tower_cookies::{Cookie, Cookies};
 
 #[derive(Deserialize)]
-struct PaginationQuery {
-    page: Option<u32>,
-    size: Option<u32>,
+pub struct PaginationQuery {
+    pub page: Option<u32>,
+    pub size: Option<u32>,
 }
 
 /// The home page! Shows your dogears list if logged in, and the login
@@ -50,11 +50,11 @@ pub async fn root(
 }
 
 #[derive(Deserialize)]
-struct LoginParams {
-    username: String,
-    password: String,
-    login_csrf_token: String,
-    return_to: String,
+pub struct LoginParams {
+    pub username: String,
+    pub password: String,
+    pub login_csrf_token: String,
+    pub return_to: String,
 }
 
 /// Handle POSTs from the login form. The login form can appear on multiple pages,
