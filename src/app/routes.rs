@@ -2,7 +2,7 @@ use super::authentication::AuthSession;
 use super::state::DogState;
 use super::templates::*;
 use super::web_result::{WebError, WebResult};
-use crate::util::{uuid_string, COOKIE_LOGIN_CSRF, PAGE_DEFAULT_SIZE};
+use crate::util::{uuid_string, COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE};
 
 use axum::{
     extract::{Form, Query, State},
@@ -47,6 +47,34 @@ pub async fn root(
     let ctx = context! {common, dogears_list};
 
     Ok(Html(state.render_view("index.html.j2", ctx)?))
+}
+
+/// Handle POSTS from the logout button. This redirects to /.
+pub async fn post_logout(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    cookies: Cookies,
+    Form(params): Form<LogoutParams>,
+) -> WebResult<Redirect> {
+    // Destroy the session! Destroy the cookie! Well, first check the csrf token.
+    if params.csrf_token != auth.session.csrf_token {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            r#"Something was wrong with that log out button! Go back to the
+                home page and try logging out again."#
+                .to_string(),
+        ));
+    }
+    // Session goes first; that way if something goes wrong and it's still alive,
+    // the user still has a cookie to try logging out with later.
+    state.db.sessions().destroy(&auth.session.id).await?;
+    cookies.remove((COOKIE_SESSION, "").into());
+    Ok(Redirect::to("/"))
+}
+
+#[derive(Deserialize)]
+pub struct LogoutParams {
+    pub csrf_token: String,
 }
 
 #[derive(Deserialize)]

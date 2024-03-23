@@ -23,6 +23,7 @@
         <form id="logout" action="/logout" method="post">
           {{common.user.username}}
           <button type="submit">Log out</button>
+          <input type="hidden" name="csrf_token" value="{{common.csrf_token}}" />
         </form>
       {% endif %}
     </header>

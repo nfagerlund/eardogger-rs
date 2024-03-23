@@ -5,6 +5,7 @@ mod templates;
 mod web_result;
 
 use authentication::session_middleware;
+use routes::*;
 use state::DogState;
 pub use templates::load_templates;
 
@@ -22,8 +23,9 @@ use tower_http::services::ServeDir;
 pub fn eardogger_app(state: DogState) -> Router {
     let session_auth = from_fn_with_state(state.clone(), session_middleware);
     Router::new()
-        .route("/", get(routes::root))
-        .route("/login", post(routes::post_login))
+        .route("/", get(root))
+        .route("/login", post(post_login))
+        .route("/logout", post(post_logout))
         .layer(session_auth)
         .layer(CookieManagerLayer::new())
         // put static files outside the auth layers
