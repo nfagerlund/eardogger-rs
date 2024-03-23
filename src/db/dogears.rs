@@ -2,7 +2,7 @@ use crate::util::{matchable_from_url, normalize_prefix_matcher, sqlite_offset, L
 use anyhow::anyhow;
 use serde::Serialize;
 use sqlx::{query, query_as, SqlitePool};
-use time::OffsetDateTime;
+use time::{serde::iso8601, OffsetDateTime};
 
 /// A query helper type for operating on [Dogears]. Usually rented from a [Db].
 pub struct Dogears<'a> {
@@ -18,6 +18,7 @@ pub struct Dogear {
     pub current: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+    #[serde(with = "iso8601")]
     pub updated: OffsetDateTime,
 }
 
