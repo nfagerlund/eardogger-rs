@@ -42,6 +42,19 @@ pub struct Common<'a> {
     pub csrf_token: &'a str,
 }
 
+impl<'a> Common<'a> {
+    /// Make a Common args with no user and an invalid csrf token. This
+    /// is for pages that can be viewed while logged out, without turning
+    /// into a login form.
+    pub fn anonymous(title: &'a str) -> Self {
+        Self {
+            title,
+            user: None,
+            csrf_token: "invalid",
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub struct TokensList<'a> {
     pub tokens: &'a [Token],

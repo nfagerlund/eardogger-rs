@@ -81,6 +81,21 @@ pub async fn fragment_dogears(
     Ok(Html(state.render_view("fragment.dogears.html.j2", ctx)?))
 }
 
+/// Display the faq/news/about page. This is almost a static page, but
+/// if there's a user around, we want them for the layout header.
+pub async fn faq(
+    State(state): State<DogState>,
+    maybe_auth: Option<AuthSession>,
+) -> WebResult<Html<String>> {
+    let title = "About Eardogger";
+    let common = match maybe_auth {
+        Some(ref auth) => auth.common_args(title),
+        None => Common::anonymous(title),
+    };
+    let ctx = context! {common};
+    Ok(Html(state.render_view("faq.html.j2", ctx)?))
+}
+
 /// Handle POSTS from the logout button. This redirects to /.
 pub async fn post_logout(
     State(state): State<DogState>,
