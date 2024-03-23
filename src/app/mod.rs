@@ -32,7 +32,8 @@ pub fn eardogger_app(state: DogState) -> Router {
         .route("/fragments/dogears", get(fragment_dogears))
         .layer(session_auth)
         .layer(CookieManagerLayer::new())
-        // put static files outside the auth layers
+        // put static files and 404 outside the auth layers
         .nest_service("/public", ServeDir::new(&state.config.assets_dir))
+        .fallback(four_oh_four)
         .with_state(state)
 }

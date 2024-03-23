@@ -1,4 +1,5 @@
 use super::state::DogState;
+use super::web_result::WebError;
 use crate::db::{Db, Session, Token, User};
 use crate::util::COOKIE_SESSION;
 use axum::{
@@ -61,12 +62,15 @@ impl<S> FromRequestParts<S> for AuthAny
 where
     S: Send + Sync,
 {
-    type Rejection = (StatusCode, &'static str);
+    type Rejection = WebError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         match parts.extensions.get::<AuthAny>() {
             Some(aa) => Ok(aa.clone()),
-            None => Err((StatusCode::UNAUTHORIZED, "Either you aren't logged in, you forgot to pass a token, or your token is no longer valid.")),
+            None => Err(WebError::new(
+                StatusCode::UNAUTHORIZED,
+                "Either you aren't logged in, you forgot to pass a token, or your token is no longer valid.".to_string()
+            )),
         }
     }
 }
@@ -76,7 +80,7 @@ impl<S> FromRequestParts<S> for AuthSession
 where
     S: Send + Sync,
 {
-    type Rejection = (StatusCode, &'static str);
+    type Rejection = WebError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         if let Some(AuthAny::Session { user, session }) = parts.extensions.get::<AuthAny>() {
@@ -85,7 +89,10 @@ where
                 session: session.clone(),
             })
         } else {
-            Err((StatusCode::UNAUTHORIZED, "You aren't logged in, so you can't do this. Go back and reload the page to start over."))
+            Err(WebError::new(
+                StatusCode::UNAUTHORIZED,
+                "You aren't logged in, so you can't do this. Go back and reload the page to start over.".to_string()
+            ))
         }
     }
 }
@@ -131,7 +138,7 @@ pub async fn session_middleware(
             }
             Err(e) => {
                 // If this hit a DB error, the site can't do much, so feel free to bail.
-                return db_error_response_tuple(e, state.config.is_prod).into_response();
+                return WebError::from(e).into_response();
             }
         }
     }
@@ -165,7 +172,7 @@ pub async fn token_middleware(
                     }
                     Err(e) => {
                         // If this hit a DB error, the site can't do much, so feel free to bail.
-                        return db_error_response_tuple(e, state.config.is_prod).into_response();
+                        return WebError::from(e).into_response();
                     }
                 }
             }
