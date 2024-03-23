@@ -41,6 +41,8 @@
   <p id="help-email" class="help help-hidden">I don't actually want your email, tbh. But if you include it, I can help recover your password if you lose it. I might also send out warnings for downtime or major changes.</p>
   <input type="text" id="email" name="email" />
 
+  <input type="hidden" name="login_csrf_token" value="{{common.csrf_token}}" />
+
   <button type="submit">Sign up</button>
 </form>
 {% endblock body %}

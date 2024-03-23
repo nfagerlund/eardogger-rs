@@ -178,6 +178,74 @@ pub async fn post_login(
     Ok(Redirect::to(redirect_to.as_str()))
 }
 
+#[derive(Deserialize)]
+pub struct SignupParams {
+    new_username: String,
+    new_password: String,
+    new_password_again: String,
+    // Really this'll always be present (and maybe blank), but downstream
+    // recipients expect an Option and will flatmap it to normalize.
+    email: Option<String>,
+    login_csrf_token: String,
+}
+
+/// Handle POSTs from the signup form. This always appears alongside the login form.
+/// It has some of the same properties, but it always redirects to /.
+pub async fn post_signup(
+    State(state): State<DogState>,
+    cookies: Cookies,
+    maybe_auth: Option<AuthSession>,
+    Form(params): Form<SignupParams>,
+) -> WebResult<Redirect> {
+    // First, check the login CSRF cookie
+    let signed_cookies = cookies.signed(&state.cookie_key);
+    let Some(csrf_cookie) = signed_cookies.get(COOKIE_LOGIN_CSRF) else {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            r#"The signup form you tried to use was broken.
+                Go back to the home page and try signing up again."#
+                .to_string(),
+        ));
+    };
+    if csrf_cookie.value() != params.login_csrf_token {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            r#"The signup form you tried to use was stale or had been
+                tampered with. Go back to the home page and try signing up again."#
+                .to_string(),
+        ));
+    }
+    // Cool. 👍🏼 Waste the cookie, it's spent.
+    signed_cookies.remove(csrf_cookie);
+
+    if maybe_auth.is_some() {
+        return Err(WebError {
+            message:
+                "Can't sign up while you're still logged in. (How'd you even do that, by the way?)"
+                    .to_string(),
+            status: StatusCode::FORBIDDEN,
+        });
+    }
+    if params.new_password != params.new_password_again {
+        return Err(WebError {
+            message: "New passwonds didn't match".to_string(),
+            status: StatusCode::BAD_REQUEST,
+        });
+    }
+    let user = state
+        .db
+        .users()
+        .create(
+            &params.new_username,
+            &params.new_password,
+            params.email.as_deref(),
+        )
+        .await?;
+    let session = state.db.sessions().create(user.id).await?;
+    cookies.add(session.into_cookie());
+    Ok(Redirect::to("/"))
+}
+
 /// Render the login form, including the anti-CSRF double-submit cookie.
 /// Notably, this is NOT a Handler fn! Since many routes can fall back
 /// to the login form, the idea is to just return an awaited call to
