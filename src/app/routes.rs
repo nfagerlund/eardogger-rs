@@ -125,6 +125,25 @@ pub async fn account(
     Ok(Html(state.render_view("account.html.j2", ctx)?))
 }
 
+/// Kind of like the account page.
+pub async fn fragment_tokens(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Query(query): Query<PaginationQuery>,
+) -> WebResult<Html<String>> {
+    let (tokens, meta) = state
+        .db
+        .tokens()
+        .list(auth.user.id, query.page(), query.size())
+        .await?;
+    let tokens_list = TokensList {
+        tokens: &tokens,
+        pagination: meta.to_pagination(),
+    };
+    let ctx = context! {tokens_list};
+    Ok(Html(state.render_view("fragment.tokens.html.j2", ctx)?))
+}
+
 /// Handle POSTs from the logout button. This redirects to /.
 pub async fn post_logout(
     State(state): State<DogState>,

@@ -30,6 +30,7 @@ pub fn eardogger_app(state: DogState) -> Router {
         .route("/logout", post(post_logout))
         .route("/signup", post(post_signup))
         .route("/fragments/dogears", get(fragment_dogears))
+        .route("/fragments/tokens", get(fragment_tokens))
         .layer(session_auth)
         .layer(CookieManagerLayer::new())
         // put static files and 404 outside the auth layers
