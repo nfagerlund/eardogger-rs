@@ -34,6 +34,9 @@ impl PaginationQuery {
 pub async fn four_oh_four() -> WebError {
     WebError::new(StatusCode::NOT_FOUND, "Well I tried, but 404".to_string())
 }
+pub async fn status() -> StatusCode {
+    StatusCode::NO_CONTENT
+}
 
 /// The home page! Shows your dogears list if logged in, and the login
 /// form if not.
