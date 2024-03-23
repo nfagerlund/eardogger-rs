@@ -3,10 +3,27 @@ use crate::{
     util::Pagination,
 };
 use minijinja::{context, Template};
+// ^^ always gonna qualify minijinja::Environment bc its name is confusing
 use serde::Serialize;
+use time::{
+    format_description::{well_known::Iso8601, FormatItem},
+    macros::format_description,
+    OffsetDateTime,
+};
 
-// ^^ I'm gonna just always refer to minijinja::Environment by its full
-// name, because the bare name is confusing.
+const SHORT_DATE: &[FormatItem] =
+    format_description!("[year]-[month repr:numerical padding:none]-[day padding:none]");
+
+/// A template filter for turning an ISO8601 timestamp into a short date like 2024-03-22.
+/// If the timestamp can't parse or lacks date elements, we default to just displaying
+/// whatever we've got.
+fn short_date(date_str: &str) -> String {
+    let Ok(date) = OffsetDateTime::parse(date_str, &Iso8601::DEFAULT) else {
+        return date_str.to_string();
+    };
+    date.format(SHORT_DATE)
+        .unwrap_or_else(|_| date_str.to_string())
+}
 
 // Right, so here's my theory of template data (today, for now). Making a
 // struct for every page would be kind of silly and a pain, so I do in fact
@@ -113,5 +130,6 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
         "marked.html.j2",
         include_str!("../../templates/marked.html.j2"),
     )?;
+    env.add_filter("short_date", short_date);
     Ok(env)
 }
