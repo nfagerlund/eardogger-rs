@@ -23,10 +23,8 @@ pub struct Token {
     scope: String, // private, use .scope().
     #[serde(with = "iso8601")]
     pub created: OffsetDateTime,
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "iso8601::option")]
     pub last_used: Option<OffsetDateTime>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
     // notably excluded: token_hash and also the temporary cleartext.
 }

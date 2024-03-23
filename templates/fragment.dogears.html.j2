@@ -7,7 +7,7 @@
   <ul id="dogears">
     {% for dogear in dogears_list.dogears %}
       <li>
-          <a href="{{dogear.current}}">{{dogear.display_name | default(dogear.prefix)}}</a>
+          <a href="{{dogear.current}}">{{dogear.display_name | unwrap_or(dogear.prefix)}}</a>
           <span class="current">({{dogear.current}})</span>
           <span class="date">Last read: {{dogear.updated | short_date}}</span>
           <button type="button" class="delete-button delete-dogear" data-dogear-id="{{dogear.id}}">Delete</button>

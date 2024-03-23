@@ -14,7 +14,7 @@
 
   <p>
     {% for dogear in marked_page.updated_dogears %}
-      <span class="serial-name">{{dogear.display_name | default(dogear.prefix)}}</span>{{", " if not loop.last}}
+      <span class="serial-name">{{dogear.display_name | unwrap_or(dogear.prefix)}}</span>{{", " if not loop.last}}
     {% endfor %}
   </p>
 

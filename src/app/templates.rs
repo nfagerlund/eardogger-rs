@@ -2,7 +2,7 @@ use crate::{
     db::{Dogear, Token, TokenScope, User},
     util::Pagination,
 };
-use minijinja::{context, Template};
+use minijinja::{escape_formatter, Value};
 // ^^ always gonna qualify minijinja::Environment bc its name is confusing
 use serde::Serialize;
 use time::{
@@ -31,6 +31,17 @@ fn explain_scope(scope_str: &str) -> &'static str {
         TokenScope::WriteDogears => "Can mark your spot.",
         TokenScope::ManageDogears => "Can view, update, and delete dogears.",
         TokenScope::Invalid => "Cannot be used.",
+    }
+}
+
+/// A replacement for minijinja's built-in `default` filter, which will
+/// replace an undefined value but doesn't usefully handle None values.
+/// This filter handles both kinds of nothing.
+fn unwrap_or(v: Value, other: Option<Value>) -> Value {
+    if v.is_undefined() || v.is_none() {
+        other.unwrap_or_else(|| Value::from(""))
+    } else {
+        v
     }
 }
 
@@ -154,5 +165,28 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
     )?;
     env.add_filter("short_date", short_date);
     env.add_filter("explain_scope", explain_scope);
+    // It's actually possible to just replace `default` by name in the environment,
+    // but I want to make sure the differing expectations are recorded for future
+    // maintenance.
+    env.add_filter("unwrap_or", unwrap_or);
+    // By default, minijinja prints None values as the literal string
+    // "none". This is apparently intentional, but I extremely don't want it.
+    // Luckily, the formatter provides a clean way to patch that for the whole
+    // runtime, instead of having to do per-type serialize shenanigans. We want
+    // the default escape_formatter for file-extension mediated HTML escaping,
+    // but we'll wrap it with a lil closure to fix Nones. Note that this ONLY
+    // affects printing; values are preserved in a typed format when passing
+    // through filters or functions.
+    env.set_formatter(|out, state, value| {
+        escape_formatter(
+            out,
+            state,
+            if value.is_none() {
+                &Value::UNDEFINED
+            } else {
+                value
+            },
+        )
+    });
     Ok(env)
 }

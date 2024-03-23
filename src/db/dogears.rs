@@ -16,7 +16,6 @@ pub struct Dogear {
     pub user_id: i64,
     pub prefix: String,
     pub current: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     #[serde(with = "iso8601")]
     pub updated: OffsetDateTime,
