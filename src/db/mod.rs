@@ -16,7 +16,7 @@ use sqlx::SqlitePool;
 // Publicize the record types, they're the star of the show
 pub use self::dogears::Dogear;
 pub use self::sessions::Session;
-pub use self::tokens::Token;
+pub use self::tokens::{Token, TokenScope};
 pub use self::users::User;
 
 /// The app's main database helper type. One of these goes in the app state,
