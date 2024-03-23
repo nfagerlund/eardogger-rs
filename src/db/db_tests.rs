@@ -157,12 +157,13 @@ async fn token_create_auth_destroy() {
     assert_eq!(auth_token.id, right_token.id);
     // DESTROY
     let wrong_destroy = tokens.destroy(right_token.id, wrong_user.id).await;
-    assert!(wrong_destroy.is_err());
+    // 404
+    assert!(wrong_destroy.expect("no err").is_none());
     let right_destroy = tokens.destroy(right_token.id, right_user.id).await;
-    assert!(right_destroy.is_ok());
+    assert!(right_destroy.expect("no err").is_some());
     let huh_destroy = tokens.destroy(right_token.id, right_user.id).await;
     // can't re-delete
-    assert!(huh_destroy.is_err());
+    assert!(huh_destroy.expect("no err").is_none());
     // can't authenticate a destroyed token
     let gone_auth = tokens
         .authenticate(&right_cleartext)

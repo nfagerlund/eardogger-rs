@@ -187,7 +187,9 @@ impl<'a> Tokens<'a> {
 
     /// Delete a token. To double-check the permissions, get the token's
     /// user ID from a trusted source and provide it when calling this.
-    pub async fn destroy(&self, id: i64, user_id: i64) -> anyhow::Result<()> {
+    /// Returns Err on database problems, Ok(None) if db's ok but there's
+    /// nothing to delete.
+    pub async fn destroy(&self, id: i64, user_id: i64) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"
                 DELETE FROM tokens
@@ -199,9 +201,9 @@ impl<'a> Tokens<'a> {
         .execute(self.pool)
         .await?;
         if res.rows_affected() == 1 {
-            Ok(())
+            Ok(Some(()))
         } else {
-            Err(anyhow!("Couldn't find the specified token."))
+            Ok(None)
         }
     }
 

@@ -11,7 +11,7 @@ pub use templates::load_templates;
 
 use axum::{
     middleware::from_fn_with_state,
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 use tower_cookies::CookieManagerLayer;
@@ -31,6 +31,7 @@ pub fn eardogger_app(state: DogState) -> Router {
         .route("/signup", post(post_signup))
         .route("/fragments/dogears", get(fragment_dogears))
         .route("/fragments/tokens", get(fragment_tokens))
+        .route("/tokens/:id", delete(delete_token))
         .layer(session_auth)
         .layer(CookieManagerLayer::new())
         // put static files and 404 outside the auth layers

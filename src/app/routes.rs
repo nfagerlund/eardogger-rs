@@ -4,6 +4,7 @@ use super::templates::*;
 use super::web_result::{WebError, WebResult};
 use crate::util::{uuid_string, COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE};
 
+use axum::extract::Path;
 use axum::{
     extract::{Form, Query, State},
     http::{StatusCode, Uri},
@@ -142,6 +143,20 @@ pub async fn fragment_tokens(
     };
     let ctx = context! {tokens_list};
     Ok(Html(state.render_view("fragment.tokens.html.j2", ctx)?))
+}
+
+/// Handle DELETE for tokens. Effectively an API method, but since it's
+/// only valid for session users, it lives outside the api namespace.
+pub async fn delete_token(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Path(id): Path<i64>,
+) -> StatusCode {
+    match state.db.tokens().destroy(id, auth.user.id).await {
+        Ok(Some(_)) => StatusCode::NO_CONTENT,       // success
+        Ok(None) => StatusCode::NOT_FOUND,           // failure
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR, // db splode
+    }
 }
 
 /// Handle POSTs from the logout button. This redirects to /.
