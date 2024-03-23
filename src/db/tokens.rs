@@ -3,7 +3,7 @@ use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta};
 use anyhow::anyhow;
 use serde::Serialize;
 use sqlx::{query, query_as, SqlitePool};
-use time::OffsetDateTime;
+use time::{serde::iso8601, OffsetDateTime};
 
 /// A query helper type for operating on [Token]s. Usually rented from a [Db].
 pub struct Tokens<'a> {
@@ -21,8 +21,12 @@ pub struct Token {
     pub id: i64,
     pub user_id: i64,
     scope: String, // private, use .scope().
+    #[serde(with = "iso8601")]
     pub created: OffsetDateTime,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(with = "iso8601::option")]
     pub last_used: Option<OffsetDateTime>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
     // notably excluded: token_hash and also the temporary cleartext.
 }

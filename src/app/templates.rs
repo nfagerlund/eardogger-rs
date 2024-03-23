@@ -1,5 +1,5 @@
 use crate::{
-    db::{Dogear, Token, User},
+    db::{Dogear, Token, TokenScope, User},
     util::Pagination,
 };
 use minijinja::{context, Template};
@@ -23,6 +23,15 @@ fn short_date(date_str: &str) -> String {
     };
     date.format(SHORT_DATE)
         .unwrap_or_else(|_| date_str.to_string())
+}
+
+/// A template filter for translating token scopes to explanatory text.
+fn explain_scope(scope_str: &str) -> &'static str {
+    match TokenScope::from(scope_str) {
+        TokenScope::WriteDogears => "Can mark your spot.",
+        TokenScope::ManageDogears => "Can view, update, and delete dogears.",
+        TokenScope::Invalid => "Cannot be used.",
+    }
 }
 
 // Right, so here's my theory of template data (today, for now). Making a
@@ -144,5 +153,6 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
         include_str!("../../templates/marked.html.j2"),
     )?;
     env.add_filter("short_date", short_date);
+    env.add_filter("explain_scope", explain_scope);
     Ok(env)
 }

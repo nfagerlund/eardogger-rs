@@ -7,9 +7,9 @@
     {% for token in tokens_list.tokens %}
       <li class="token" data-token-id="{{token.id}}">
         <span class="token-comment">{{token.comment}}</span>
-        <span class="token-last-used">Last used: {{token.last_used | default("never")}}</span>
-        <span class="token-created">Created: {{token.created}}</span>
-        <span class="token-scope">{{token.scope}}</span>
+        <span class="token-last-used">Last used: {{token.last_used | default("never") | short_date}}</span>
+        <span class="token-created">Created: {{token.created | short_date}}</span>
+        <span class="token-scope">{{token.scope | explain_scope}}</span>
         <button type="button" class="delete-button token-delete" data-token-id="{{token.id}}">Delete</button>
       </li>
     {% endfor %}
