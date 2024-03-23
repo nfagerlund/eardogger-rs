@@ -15,8 +15,19 @@ use tower_cookies::{Cookie, Cookies};
 
 #[derive(Deserialize)]
 pub struct PaginationQuery {
-    pub page: Option<u32>,
-    pub size: Option<u32>,
+    page: Option<u32>,
+    size: Option<u32>,
+}
+
+impl PaginationQuery {
+    /// Getter w/ default value
+    pub fn page(&self) -> u32 {
+        self.page.unwrap_or(1)
+    }
+    /// Getter w/ default value
+    pub fn size(&self) -> u32 {
+        self.size.unwrap_or(PAGE_DEFAULT_SIZE)
+    }
 }
 
 /// The home page! Shows your dogears list if logged in, and the login
@@ -34,9 +45,11 @@ pub async fn root(
         return login_form(state, cookies, &path).await;
     };
 
-    let page = query.page.unwrap_or(1);
-    let size = query.size.unwrap_or(PAGE_DEFAULT_SIZE);
-    let (dogears, meta) = state.db.dogears().list(auth.user.id, page, size).await?;
+    let (dogears, meta) = state
+        .db
+        .dogears()
+        .list(auth.user.id, query.page(), query.size())
+        .await?;
     let title = format!("{}'s Dogears", &auth.user.username);
 
     let common = auth.common_args(&title);
@@ -47,6 +60,25 @@ pub async fn root(
     let ctx = context! {common, dogears_list};
 
     Ok(Html(state.render_view("index.html.j2", ctx)?))
+}
+
+/// Kind of like the index page, except 1. no login form, 2. therefore auth required.
+pub async fn fragment_dogears(
+    State(state): State<DogState>,
+    Query(query): Query<PaginationQuery>,
+    auth: AuthSession,
+) -> WebResult<Html<String>> {
+    let (dogears, meta) = state
+        .db
+        .dogears()
+        .list(auth.user.id, query.page(), query.size())
+        .await?;
+    let dogears_list = DogearsList {
+        dogears: &dogears,
+        pagination: meta.to_pagination(),
+    };
+    let ctx = context! {dogears_list};
+    Ok(Html(state.render_view("fragment.dogears.html.j2", ctx)?))
 }
 
 /// Handle POSTS from the logout button. This redirects to /.
