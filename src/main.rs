@@ -14,12 +14,20 @@ use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tower_cookies::Key;
+use tracing_subscriber::{
+    fmt::layer as fmt_layer, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
+};
 use url::Url;
 
 use crate::app::{eardogger_app, load_templates, state::*};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Set up tracing
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with(fmt_layer())
+        .init();
     // Set up the database connection pool
     // TODO: extract DB url into config
     let db_url = "sqlite:dev.db";
