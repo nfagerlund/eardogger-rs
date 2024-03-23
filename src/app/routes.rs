@@ -13,6 +13,7 @@ use axum::{
 use minijinja::context;
 use serde::Deserialize;
 use tower_cookies::{Cookie, Cookies};
+use tracing::error;
 
 #[derive(Deserialize)]
 pub struct PaginationQuery {
@@ -177,7 +178,14 @@ pub async fn post_logout(
     }
     // Session goes first; that way if something goes wrong and it's still alive,
     // the user still has a cookie to try logging out with later.
-    state.db.sessions().destroy(&auth.session.id).await?;
+    let res = state.db.sessions().destroy(&auth.session.id).await?;
+    if res.is_none() {
+        error!(
+            logout.sessid = %auth.session.id,
+            logout.userid = %auth.user.id,
+            "Session not found for logout. This should be impossible, since we had a valid session!"
+        );
+    }
     cookies.remove((COOKIE_SESSION, "").into());
     Ok(Redirect::to("/"))
 }

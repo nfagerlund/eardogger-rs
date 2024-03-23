@@ -96,7 +96,8 @@ impl<'a> Sessions<'a> {
         .map_err(|e| e.into())
     }
 
-    pub async fn destroy(&self, sessid: &str) -> anyhow::Result<()> {
+    /// Returns Ok(Some) on success, Ok(None) on a well-behaved not-found.
+    pub async fn destroy(&self, sessid: &str) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"
                 DELETE FROM sessions
@@ -107,11 +108,9 @@ impl<'a> Sessions<'a> {
         .execute(self.pool)
         .await?;
         if res.rows_affected() == 1 {
-            Ok(())
+            Ok(Some(()))
         } else {
-            Err(anyhow!(
-                "Couldn't find the specified login session; you must have already logged out."
-            ))
+            Ok(None)
         }
     }
 
