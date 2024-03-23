@@ -95,7 +95,7 @@ impl<'a> Tokens<'a> {
         scope: TokenScope,
         comment: Option<&str>,
     ) -> anyhow::Result<(Token, String)> {
-        let token_cleartext = uuid_string();
+        let token_cleartext = format!("eardoggerv1.{}", uuid_string());
         let token_hash = sha256sum(&token_cleartext);
         let scope_str: &str = scope.into();
         let token = query_as!(
