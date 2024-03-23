@@ -120,8 +120,8 @@ impl<'a> Dogears<'a> {
         Ok(res.map(|r| r.current))
     }
 
-    /// yeah
-    pub async fn destroy(&self, id: i64, user_id: i64) -> anyhow::Result<()> {
+    /// yeah. Returns Ok(Some) on success, Ok(None) on not-found.
+    pub async fn destroy(&self, id: i64, user_id: i64) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"
                 DELETE FROM dogears
@@ -133,9 +133,9 @@ impl<'a> Dogears<'a> {
         .execute(self.pool)
         .await?;
         if res.rows_affected() == 1 {
-            Ok(())
+            Ok(Some(()))
         } else {
-            Err(anyhow!("Couldn't find the specified dogear."))
+            Ok(None)
         }
     }
 

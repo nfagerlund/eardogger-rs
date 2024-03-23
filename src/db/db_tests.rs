@@ -51,7 +51,11 @@ async fn cascading_delete() {
     assert_eq!(dogear_list.len(), 1);
 
     // FINALLY: delete user and verify cascade
-    users.destroy(user1.id).await.unwrap();
+    users
+        .destroy(user1.id)
+        .await
+        .expect("no err")
+        .expect("found and deleted");
     assert!(users
         .authenticate("user1", "pass1")
         .await
@@ -390,8 +394,16 @@ async fn dogears() {
 
     // DESTROY
     // safety switch: user_id needs to match
-    assert!(dogears.destroy(second.id, wrong_user.id).await.is_err());
-    assert!(dogears.destroy(second.id, user.id).await.is_ok());
+    assert!(dogears
+        .destroy(second.id, wrong_user.id)
+        .await
+        .expect("no err")
+        .is_none()); // 404
+    assert!(dogears
+        .destroy(second.id, user.id)
+        .await
+        .expect("no err")
+        .is_some());
     // list shrinks
     let (list, _) = dogears.list(user.id, 1, 50).await.expect("no err");
     assert_eq!(list.len(), 2);

@@ -223,7 +223,8 @@ impl<'a> Users<'a> {
         }
     }
 
-    pub async fn destroy(&self, id: i64) -> anyhow::Result<()> {
+    /// Returns Ok(Some) on success, Ok(None) on not-found.
+    pub async fn destroy(&self, id: i64) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"
                 DELETE FROM users WHERE id = ?;
@@ -232,10 +233,10 @@ impl<'a> Users<'a> {
         )
         .execute(self.pool)
         .await?;
-        if res.rows_affected() != 1 {
-            Err(anyhow!("Couldn't find the specified user."))
+        if res.rows_affected() == 1 {
+            Ok(Some(()))
         } else {
-            Ok(())
+            Ok(None)
         }
     }
 }
