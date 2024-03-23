@@ -6,6 +6,7 @@ use db::Db;
 use sqlx::{
     pool::PoolOptions,
     sqlite::{Sqlite, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
+    SqlitePool,
 };
 use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
@@ -22,17 +23,7 @@ async fn main() -> anyhow::Result<()> {
     // Set up the database connection pool
     // TODO: extract DB url into config
     let db_url = "sqlite:dev.db";
-    let db_opts = SqliteConnectOptions::from_str(db_url)?;
-    let db_opts = db_opts
-        .journal_mode(SqliteJournalMode::Wal)
-        .optimize_on_close(true, 400)
-        .synchronous(SqliteSynchronous::Normal) // usually fine w/ wal
-        .foreign_keys(true);
-    let pool_opts: PoolOptions<Sqlite> = PoolOptions::new()
-        .max_connections(50) // default's 10, seems low
-        // boss makes a dollar, db thread makes a dime, that's why I fish crab on company time
-        .max_lifetime(Duration::from_secs(60 * 60 * 8));
-    let pool = pool_opts.connect_with(db_opts).await?;
+    let pool = db_connect(db_url).await?;
     // TODO: migrations?
 
     // Set up the cookie key
@@ -51,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
         own_origin,
         assets_dir,
     };
-    let templates = app::load_templates()?;
+    let templates = load_templates()?;
     let inner = DSInner {
         db,
         config,
@@ -91,4 +82,18 @@ async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
         f.write_all(key.master()).await?;
         Ok(key)
     }
+}
+
+async fn db_connect(db_url: &str) -> Result<SqlitePool, sqlx::Error> {
+    let db_opts = SqliteConnectOptions::from_str(db_url)?;
+    let db_opts = db_opts
+        .journal_mode(SqliteJournalMode::Wal)
+        .optimize_on_close(true, 400)
+        .synchronous(SqliteSynchronous::Normal) // usually fine w/ wal
+        .foreign_keys(true);
+    let pool_opts: PoolOptions<Sqlite> = PoolOptions::new()
+        .max_connections(50) // default's 10, seems low
+        // boss makes a dollar, db thread makes a dime, that's why I fish crab on company time
+        .max_lifetime(Duration::from_secs(60 * 60 * 8));
+    pool_opts.connect_with(db_opts).await
 }
