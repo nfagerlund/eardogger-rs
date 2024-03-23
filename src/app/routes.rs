@@ -34,10 +34,11 @@ impl PaginationQuery {
 /// form if not.
 pub async fn root(
     State(state): State<DogState>,
-    uri: Uri,
     Query(query): Query<PaginationQuery>,
-    cookies: Cookies,
     maybe_auth: Option<AuthSession>,
+    // for login form:
+    uri: Uri,
+    cookies: Cookies,
 ) -> WebResult<Html<String>> {
     // Branch to login form, maybe
     let Some(auth) = maybe_auth else {
@@ -96,7 +97,27 @@ pub async fn faq(
     Ok(Html(state.render_view("faq.html.j2", ctx)?))
 }
 
-/// Handle POSTS from the logout button. This redirects to /.
+/// The account page. Requires logged-in.
+pub async fn account(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Query(query): Query<PaginationQuery>,
+) -> WebResult<Html<String>> {
+    let (tokens, meta) = state
+        .db
+        .tokens()
+        .list(auth.user.id, query.page(), query.size())
+        .await?;
+    let common = auth.common_args("Manage account");
+    let tokens_list = TokensList {
+        tokens: &tokens,
+        pagination: meta.to_pagination(),
+    };
+    let ctx = context! {common, tokens_list};
+    Ok(Html(state.render_view("account.html.j2", ctx)?))
+}
+
+/// Handle POSTs from the logout button. This redirects to /.
 pub async fn post_logout(
     State(state): State<DogState>,
     auth: AuthSession,

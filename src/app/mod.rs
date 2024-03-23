@@ -25,6 +25,7 @@ pub fn eardogger_app(state: DogState) -> Router {
     Router::new()
         .route("/", get(root))
         .route("/faq", get(faq))
+        .route("/account", get(account))
         .route("/login", post(post_login))
         .route("/logout", post(post_logout))
         .route("/signup", post(post_signup))
