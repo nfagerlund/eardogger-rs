@@ -32,6 +32,7 @@ use std::error::Error;
 
 /// An IntoResponse type that any error can be converted to, for displaying
 /// HTML error pages from a route.
+#[derive(Debug)]
 pub struct WebError {
     pub message: String,
     pub status: StatusCode,
@@ -78,6 +79,7 @@ impl<E: ToString> From<E> for WebError {
 }
 
 impl IntoResponse for WebError {
+    #[tracing::instrument]
     fn into_response(self) -> Response {
         let page = format!(include_str!("../../templates/_error.html"), &self.message);
         (self.status, Html(page)).into_response()

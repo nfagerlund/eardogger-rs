@@ -7,6 +7,7 @@ use time::OffsetDateTime;
 
 /// A query helper type for operating on [User]s. Usually you rent this from
 /// a [Db].
+#[derive(Debug)]
 pub struct Users<'a> {
     pool: &'a SqlitePool,
 }
@@ -85,6 +86,7 @@ impl<'a> Users<'a> {
     }
 
     /// Create a new user account.
+    #[tracing::instrument]
     pub async fn create(
         &self,
         username: &str,
@@ -113,6 +115,7 @@ impl<'a> Users<'a> {
     }
 
     /// Fetch a user and their password hash, by name. Deliberately not public API.
+    #[tracing::instrument]
     async fn by_name_with_password_hash(
         &self,
         username: &str,
@@ -134,6 +137,7 @@ impl<'a> Users<'a> {
 
     /// Just fetch a user. Most app logic should use [`authenticate`] instead,
     /// but this is nice to have in tests.
+    #[tracing::instrument]
     pub async fn by_name(&self, username: &str) -> anyhow::Result<Option<User>> {
         Ok(self
             .by_name_with_password_hash(username)
@@ -143,6 +147,7 @@ impl<'a> Users<'a> {
 
     /// Authenticate a user by username and password. Only returns Some if the
     /// user exists and the password matches.
+    #[tracing::instrument]
     pub async fn authenticate(
         &self,
         username: &str,
@@ -157,6 +162,7 @@ impl<'a> Users<'a> {
     }
 
     /// Hard-set a user's password. Assumes you've already validated the inputs.
+    #[tracing::instrument]
     pub async fn set_password(&self, username: &str, new_password: &str) -> anyhow::Result<()> {
         let password_hash = bcrypt::hash(new_password, 12)?;
         let res = query!(
@@ -178,6 +184,7 @@ impl<'a> Users<'a> {
 
     /// Authenticate a user's current password and then change it to a double-submitted
     /// new password.
+    #[tracing::instrument]
     pub async fn change_password(
         &self,
         username: &str,
@@ -203,6 +210,7 @@ impl<'a> Users<'a> {
     /// Set or clear the user's email. BTW, this and set_password take username
     /// instead of ID in order to give better errors, since these errors
     /// will definitely flow all the way up to the frontend.
+    #[tracing::instrument]
     pub async fn set_email(&self, username: &str, email: Option<&str>) -> anyhow::Result<()> {
         let email = clean_email(email);
 
@@ -224,6 +232,7 @@ impl<'a> Users<'a> {
     }
 
     /// Returns Ok(Some) on success, Ok(None) on not-found.
+    #[tracing::instrument]
     pub async fn destroy(&self, id: i64) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"

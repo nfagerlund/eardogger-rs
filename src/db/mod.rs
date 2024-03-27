@@ -22,7 +22,7 @@ pub use self::users::User;
 /// The app's main database helper type. One of these goes in the app state,
 /// and you can use it to access all the various resource methods, namespaced
 /// for readability.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Db {
     pool: SqlitePool,
 }

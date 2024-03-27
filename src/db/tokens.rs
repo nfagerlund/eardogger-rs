@@ -6,6 +6,7 @@ use sqlx::{query, query_as, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
 
 /// A query helper type for operating on [Token]s. Usually rented from a [Db].
+#[derive(Debug)]
 pub struct Tokens<'a> {
     pool: &'a SqlitePool,
 }
@@ -91,6 +92,7 @@ impl<'a> Tokens<'a> {
 
     /// Create a token, and return it along with the *actual token cleartext.*
     /// This is the only time the cleartext is ever available.
+    #[tracing::instrument]
     pub async fn create(
         &self,
         user_id: i64,
@@ -120,6 +122,7 @@ impl<'a> Tokens<'a> {
 
     /// Use the provided token cleartext to look up a token and its associated user.
     /// Returns Ok(None) if the token doesn't match anything.
+    #[tracing::instrument]
     pub async fn authenticate(
         &self,
         token_cleartext: &str,
@@ -189,6 +192,7 @@ impl<'a> Tokens<'a> {
     /// user ID from a trusted source and provide it when calling this.
     /// Returns Err on database problems, Ok(None) if db's ok but there's
     /// nothing to delete.
+    #[tracing::instrument]
     pub async fn destroy(&self, id: i64, user_id: i64) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"
@@ -208,6 +212,7 @@ impl<'a> Tokens<'a> {
     }
 
     /// List some of a user's tokens, with an adjustable page size.
+    #[tracing::instrument]
     pub async fn list(
         &self,
         user_id: i64,

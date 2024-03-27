@@ -9,6 +9,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use std::fmt::Debug;
 use std::sync::Arc;
 use tower_cookies::Cookies;
 
@@ -60,10 +61,11 @@ impl AuthSession {
 #[async_trait]
 impl<S> FromRequestParts<S> for AuthAny
 where
-    S: Send + Sync,
+    S: Send + Sync + Debug,
 {
     type Rejection = WebError;
 
+    #[tracing::instrument]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         match parts.extensions.get::<AuthAny>() {
             Some(aa) => Ok(aa.clone()),
@@ -78,10 +80,11 @@ where
 #[async_trait]
 impl<S> FromRequestParts<S> for AuthSession
 where
-    S: Send + Sync,
+    S: Send + Sync + Debug,
 {
     type Rejection = WebError;
 
+    #[tracing::instrument]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         if let Some(AuthAny::Session { user, session }) = parts.extensions.get::<AuthAny>() {
             Ok(AuthSession {
@@ -115,6 +118,7 @@ where
 
 /// Function middleware to validate a login session and make the logged-in user
 /// available to routes.
+#[tracing::instrument]
 pub async fn session_middleware(
     State(state): State<DogState>,
     cookies: Cookies,
@@ -149,6 +153,7 @@ pub async fn session_middleware(
 /// Function middleware to validate a token passed in the `Authorization: Bearer STUFF`
 /// header and make the token's user available to routes. This should only be applied
 /// to API routes, and it overrides the session user if both would have been present.
+#[tracing::instrument]
 pub async fn token_middleware(
     State(state): State<DogState>,
     mut request: Request,

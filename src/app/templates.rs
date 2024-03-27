@@ -116,6 +116,7 @@ pub struct ErrorPage<'a> {
 
 // For now, I'm just gonna load all the templates statically and compile em
 // in to the app.
+#[tracing::instrument]
 pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
     let mut env = minijinja::Environment::new();
     env.add_template(

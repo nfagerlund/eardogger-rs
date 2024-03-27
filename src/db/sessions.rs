@@ -11,6 +11,7 @@ use tower_cookies::cookie::{Cookie, SameSite};
 const SESSION_LIFETIME_MODIFIER: &str = "+90 days";
 
 /// A query helper type for operating on [Session]s. Usually rented from a [Db].
+#[derive(Debug)]
 pub struct Sessions<'a> {
     pool: &'a SqlitePool,
 }
@@ -58,6 +59,7 @@ impl<'a> Sessions<'a> {
     /// cleanup operation that should happen as a background task rather than
     /// blocking a user request... but it should happen fairly often so the
     /// number of sessions to waste at once never gets very large.
+    #[tracing::instrument]
     pub async fn delete_expired(&self) -> anyhow::Result<u64> {
         // y'know, ideally I would like to set a limit for how many
         // records to waste at a time, just to guard against blowouts...
@@ -75,6 +77,7 @@ impl<'a> Sessions<'a> {
     }
 
     /// Make a new user login session
+    #[tracing::instrument]
     pub async fn create(&self, user_id: i64) -> anyhow::Result<Session> {
         let sessid = uuid_string();
         let csrf_token = uuid_string();
@@ -97,6 +100,7 @@ impl<'a> Sessions<'a> {
     }
 
     /// Returns Ok(Some) on success, Ok(None) on a well-behaved not-found.
+    #[tracing::instrument]
     pub async fn destroy(&self, sessid: &str) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"
@@ -117,6 +121,7 @@ impl<'a> Sessions<'a> {
     /// Find the user and session for a given session ID (IF the session is
     /// still valid). As a side-effect, updates the session's expiration date
     /// to maintain the rolling window.
+    #[tracing::instrument]
     pub async fn authenticate(&self, sessid: &str) -> anyhow::Result<Option<(Session, User)>> {
         // First do a fire-and-forget update, it's fine if it whiffs.
         query!(

@@ -8,7 +8,7 @@ use crate::db::Db;
 pub type DogState = Arc<DSInner>;
 
 /// Stuff for the stuff gods!!!
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DSInner {
     pub db: Db,
     pub config: DogConfig,
@@ -18,7 +18,7 @@ pub struct DSInner {
 
 /// Stuff that should be sourced from configuration, but for right now
 /// I'm just cramming it in wherever.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DogConfig {
     pub is_prod: bool,
     /// The site's own base URL.
@@ -28,7 +28,8 @@ pub struct DogConfig {
 }
 
 impl DSInner {
-    pub fn render_view<S: Serialize>(
+    #[tracing::instrument]
+    pub fn render_view<S: Serialize + std::fmt::Debug>(
         &self,
         name: &str,
         ctx: S,
