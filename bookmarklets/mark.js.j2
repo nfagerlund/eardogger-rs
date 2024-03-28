@@ -1,11 +1,12 @@
 // Update existing dogear, or create a new dogear. Use token auth instead of
 // session cookie.
+// Template args: own_origin, token
 
 (
   ()=>{
     let d = document;
-    let t = '<TOKEN>';
-    let e = 'https://eardogger.com';
+    let t = {{token}};
+    let e = {{own_origin}};
     let s = {
       position:'absolute',
       width:'300px',

@@ -1,8 +1,9 @@
 // Immediately jump to your dogeared location for the current site.
+// Template args: own_origin
 
 (
   () => {
     let l = document.location;
-    l.href = 'https://eardogger.com/resume/' + encodeURIComponent(l.href);
+    l.href = {{own_origin}} + '/resume/' + encodeURIComponent(l.href);
   }
 )();
