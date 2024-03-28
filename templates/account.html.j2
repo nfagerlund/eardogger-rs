@@ -17,6 +17,8 @@
     <label for="new_password_again">Confirm new password</label>
     <input type="password" id="new_password_again" name="new_password_again" />
 
+    <input type="hidden" name="csrf_token" value="{{common.csrf_token}}" />
+
     <button type="submit">Change password</button>
   </form>
 </details>

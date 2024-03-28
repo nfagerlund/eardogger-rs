@@ -5,6 +5,7 @@ use anyhow::anyhow;
 use rand::{thread_rng, RngCore};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 use url::Url;
 
 pub use bookmarklets::*;
@@ -118,6 +119,24 @@ pub fn sqlite_offset(page: u32, size: u32) -> anyhow::Result<i64> {
     size_i64.checked_mul(zero_idx_page_i64).ok_or_else(|| {
         anyhow!("Literally impossible, but apparently page * size overflowed an i64.")
     })
+}
+
+#[derive(Error, Debug)]
+pub enum NewPasswordError {
+    #[error("New passwords didn't match.")]
+    NonMatching,
+    #[error("New password can't be empty.")]
+    Empty,
+}
+
+pub fn check_new_password(new1: &str, new2: &str) -> Result<(), NewPasswordError> {
+    if new1 != new2 {
+        Err(NewPasswordError::NonMatching)
+    } else if new1.is_empty() {
+        Err(NewPasswordError::Empty)
+    } else {
+        Ok(())
+    }
 }
 
 /// Trim any leading "m." or "www." subdomains off a hostname at the start

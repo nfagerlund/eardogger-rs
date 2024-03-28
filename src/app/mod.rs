@@ -29,6 +29,7 @@ pub fn eardogger_app(state: DogState) -> Router {
         .route("/login", post(post_login))
         .route("/logout", post(post_logout))
         .route("/signup", post(post_signup))
+        .route("/changepassword", post(post_changepassword))
         .route("/fragments/dogears", get(fragment_dogears))
         .route("/fragments/tokens", get(fragment_tokens))
         .route("/tokens/:id", delete(delete_token))

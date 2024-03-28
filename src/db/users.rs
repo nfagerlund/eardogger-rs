@@ -161,7 +161,7 @@ impl<'a> Users<'a> {
         Ok(None)
     }
 
-    /// Hard-set a user's password. Assumes you've already validated the inputs.
+    /// Hard-set a user's password. IMPORTANT: assumes you've already validated the inputs!
     #[tracing::instrument]
     pub async fn set_password(&self, username: &str, new_password: &str) -> anyhow::Result<()> {
         let password_hash = bcrypt::hash(new_password, 12)?;
@@ -180,31 +180,6 @@ impl<'a> Users<'a> {
         } else {
             Ok(())
         }
-    }
-
-    /// Authenticate a user's current password and then change it to a double-submitted
-    /// new password.
-    #[tracing::instrument]
-    pub async fn change_password(
-        &self,
-        username: &str,
-        old_password: &str,
-        new_password: &str,
-        new_password_again: &str,
-    ) -> anyhow::Result<()> {
-        let old_password = valid_password(old_password)?;
-        let new_password = valid_password(new_password)?;
-        let new_password_again = valid_password(new_password_again)?;
-
-        if new_password != new_password_again {
-            return Err(anyhow!("New passwords didn't match."));
-        }
-
-        let Some(user) = self.authenticate(username, old_password).await? else {
-            return Err(anyhow!("Old password was wrong."));
-        };
-
-        self.set_password(&user.username, new_password).await
     }
 
     /// Set or clear the user's email. BTW, this and set_password take username

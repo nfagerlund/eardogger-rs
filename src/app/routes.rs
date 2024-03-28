@@ -2,7 +2,9 @@ use super::authentication::AuthSession;
 use super::state::DogState;
 use super::templates::*;
 use super::web_result::{WebError, WebResult};
-use crate::util::{uuid_string, COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE};
+use crate::util::{
+    check_new_password, uuid_string, COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE,
+};
 
 use axum::extract::Path;
 use axum::{
@@ -323,9 +325,9 @@ pub async fn post_signup(
             status: StatusCode::FORBIDDEN,
         });
     }
-    if params.new_password != params.new_password_again {
+    if let Err(e) = check_new_password(&params.new_password, &params.new_password_again) {
         return Err(WebError {
-            message: "New passwonds didn't match".to_string(),
+            message: e.to_string(),
             status: StatusCode::BAD_REQUEST,
         });
     }
@@ -341,6 +343,54 @@ pub async fn post_signup(
     let session = state.db.sessions().create(user.id).await?;
     cookies.add(session.into_cookie());
     Ok(Redirect::to("/"))
+}
+
+/// Change password form args
+#[derive(Deserialize, Debug)]
+pub struct ChangePasswordParams {
+    password: String,
+    new_password: String,
+    new_password_again: String,
+    csrf_token: String,
+}
+
+/// The change password form, on the account page. Acts a little like the signup form.
+#[tracing::instrument]
+pub async fn post_changepassword(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Form(params): Form<ChangePasswordParams>,
+) -> WebResult<Redirect> {
+    if params.csrf_token != auth.session.csrf_token {
+        return Err(WebError {
+            message: r#"The change password form you tried to use was stale, or
+                had been tampered with. Go back to the account page and try
+                changing your password again."#
+                .to_string(),
+            status: StatusCode::BAD_REQUEST,
+        });
+    }
+    if let Err(e) = check_new_password(&params.new_password, &params.new_password_again) {
+        return Err(WebError {
+            message: e.to_string(),
+            status: StatusCode::BAD_REQUEST,
+        });
+    }
+    let users = state.db.users();
+    let Some(user) = users
+        .authenticate(&auth.user.username, &params.password)
+        .await?
+    else {
+        return Err(WebError {
+            message: "Wrong existing password".to_string(),
+            status: StatusCode::BAD_REQUEST,
+        });
+    };
+    users
+        .set_password(&user.username, &params.new_password)
+        .await?;
+
+    Ok(Redirect::to("/account?changed=password"))
 }
 
 /// Render the login form, including the anti-CSRF double-submit cookie.

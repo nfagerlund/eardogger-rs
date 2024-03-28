@@ -230,14 +230,8 @@ async fn user_password_auth() {
         .is_none());
 
     // EDIT PASSWORD
-    // news must match
     assert!(users
-        .change_password(user.username.as_str(), "aoeuhtns", "snthueoa", "snthsnth")
-        .await
-        .is_err());
-    // ok, so:
-    assert!(users
-        .change_password(user.username.as_str(), "aoeuhtns", "snthueoa", "snthueoa")
+        .set_password(user.username.as_str(), "snthueoa")
         .await
         .is_ok());
     // new pw works
