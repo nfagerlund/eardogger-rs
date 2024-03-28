@@ -9,6 +9,7 @@ edition = "2021"
 # Foundations:
 tokio = { version = "1.36.0", features = ["full"] }
 anyhow = "1.0.79"
+thiserror = "1.0.58"
 tracing = "0.1.40"
 serde = { version = "1", features = ["derive"] }
 regex = "1.10.3"
