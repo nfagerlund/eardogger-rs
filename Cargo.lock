@@ -538,6 +538,7 @@ dependencies = [
  "html-escape",
  "lazy_static",
  "minijinja",
+ "percent-encoding",
  "rand",
  "regex",
  "serde",
