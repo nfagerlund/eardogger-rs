@@ -1,8 +1,14 @@
+mod bookmarklets;
+mod url_encoding;
+
 use anyhow::anyhow;
 use rand::{thread_rng, RngCore};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use url::Url;
+
+pub use bookmarklets::*;
+pub use url_encoding::*;
 
 // Constants
 /// The session cookie name. This is a pre-existing value from eardogger 1...
