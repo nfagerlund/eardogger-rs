@@ -119,6 +119,14 @@ pub struct ErrorPage<'a> {
 #[tracing::instrument]
 pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
     let mut env = minijinja::Environment::new();
+    // Bookmarklets:
+    env.add_template("mark.js.j2", include_str!("../../bookmarklets/mark.js.j2"))?;
+    env.add_template(
+        "where.js.j2",
+        include_str!("../../bookmarklets/where.js.j2"),
+    )?;
+
+    // HTML views:
     env.add_template(
         "_layout.html.j2",
         include_str!("../../templates/_layout.html.j2"),
@@ -190,4 +198,38 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
         )
     });
     Ok(env)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use minijinja::context;
+
+    // Using an embedded template to avoid brittleness with actual
+    // template text that might change over time.
+    #[test]
+    fn bookmarklet_escaping() {
+        let mut env = load_templates().expect("loads ok");
+        env.add_template(
+            "test.js.j2",
+            r##"(() => { document.location.href = {{ own_origin }} + '/resume/' + encodeURIComponent(location.href); })();"##
+        ).expect("added ok");
+
+        let ctx = context! {
+            own_origin => "https://eardogger.com",
+        };
+        let res = env
+            .get_template("test.js.j2")
+            .expect("got ok")
+            .render(ctx)
+            .expect("rendered ok");
+        // The json auto-formatter QUOTES the input string when interpolating it:
+        let expected = r##"(() => { document.location.href = "https://eardogger.com" + '/resume/' + encodeURIComponent(location.href); })();"##;
+        assert_eq!(res, expected);
+        let bookmarklet = crate::util::make_bookmarklet(&res);
+        // haha ok, it looks hella nasty, but anyway, I tested this in a browser
+        // and it works as expected.
+        let expected_bmkt = r#"javascript:(()%20%3D%3E%20%7B%20document.location.href%20%3D%20%22https%3A%2F%2Feardogger.com%22%20%2B%20'%2Fresume%2F'%20%2B%20encodeURIComponent(location.href)%3B%20%7D)()%3B"#;
+        assert_eq!(bookmarklet, expected_bmkt);
+    }
 }

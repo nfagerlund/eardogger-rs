@@ -4,6 +4,7 @@ use tower_cookies::Key;
 use url::Url;
 
 use crate::db::Db;
+use crate::util::make_bookmarklet;
 
 pub type DogState = Arc<DSInner>;
 
@@ -35,5 +36,21 @@ impl DSInner {
         ctx: S,
     ) -> Result<String, minijinja::Error> {
         self.templates.get_template(name)?.render(ctx)
+    }
+
+    /// Render a bookmarklet template into a `javascript:` URL.
+    #[tracing::instrument]
+    pub fn render_bookmarklet<S: Serialize + std::fmt::Debug>(
+        &self,
+        name: &str,
+        token: Option<&str>,
+    ) -> Result<String, minijinja::Error> {
+        let ctx = minijinja::context! {
+            own_origin => &self.config.own_origin.as_str(),
+            token => token,
+        };
+        Ok(make_bookmarklet(
+            &self.templates.get_template(name)?.render(ctx)?,
+        ))
     }
 }
