@@ -35,6 +35,9 @@ const URI_COMPONENT: AsciiSet = CONTROLS
     .add(b'<')
     .add(b'>');
 
+/// Encode some text to be included in a URL, escaping any characters
+/// that are considered part of the URL syntax (and then some!!). The
+/// return type implements Display and thus has `.to_string()`.
 pub fn encode_uri_component(c: &str) -> PercentEncode {
     utf8_percent_encode(c, &URI_COMPONENT)
 }
