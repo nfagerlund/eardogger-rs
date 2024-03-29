@@ -1,18 +1,11 @@
 use crate::{
     db::{Dogear, Token, TokenScope, User},
-    util::Pagination,
+    util::{Pagination, SHORT_DATE},
 };
 use minijinja::{escape_formatter, Value};
 // ^^ always gonna qualify minijinja::Environment bc its name is confusing
 use serde::Serialize;
-use time::{
-    format_description::{well_known::Iso8601, FormatItem},
-    macros::format_description,
-    OffsetDateTime,
-};
-
-const SHORT_DATE: &[FormatItem] =
-    format_description!("[year]-[month repr:numerical padding:none]-[day padding:none]");
+use time::{format_description::well_known::Iso8601, OffsetDateTime};
 
 /// A template filter for turning an ISO8601 timestamp into a short date like 2024-03-22.
 /// If the timestamp can't parse or lacks date elements, we default to just displaying

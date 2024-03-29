@@ -6,12 +6,16 @@ use rand::{thread_rng, RngCore};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+use time::{format_description::FormatItem, macros::format_description};
 use url::Url;
 
 pub use bookmarklets::*;
 pub use url_encoding::*;
 
 // Constants
+/// A time crate format description, like this: 2024-3-22
+pub const SHORT_DATE: &[FormatItem] =
+    format_description!("[year]-[month repr:numerical padding:none]-[day padding:none]");
 /// The session cookie name. This is a pre-existing value from eardogger 1...
 /// not that those sessions will be valid anymore, but re-using it should help
 /// reduce junk cookie pollution. 👍🏼
