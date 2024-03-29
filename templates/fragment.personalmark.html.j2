@@ -1,0 +1,15 @@
+{# Context: personal_mark: PersonalMark #}
+{% from "macro.bookmarklet.html.j2" import bookmarklet %}
+<div id="generate-personal-bookmarklet-fragment">
+  <p><span class="cartouche unready">(Generated!)</span></p>
+
+  <p class="only desktop">Next, bookmark the link below! You can drag and drop it onto your bookmarks toolbar, or right-click it and select "bookmark."</p>
+
+  <p class="only ios android">Next, copy the big fugly URL below to your clipboard:</p>
+
+  {{ bookmarklet(name="Mark my spot" id="mark" url=personal_mark.bookmarklet_url) }}
+
+  <p class="only ios">Finally, open your bookmarks and tap "edit". Find the bookmark you made earlier, and replace its URL with the URL you just copied.</p>
+
+  <p class="only android">Finally, open your bookmarks and find the bookmark you made earlier. Edit it, and replace its URL with the URL you just copied.</p>
+</div>

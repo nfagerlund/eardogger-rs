@@ -2,8 +2,10 @@ use super::authentication::AuthSession;
 use super::state::DogState;
 use super::templates::*;
 use super::web_result::{WebError, WebResult};
+use crate::db::TokenScope;
 use crate::util::{
     check_new_password, uuid_string, COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE,
+    SHORT_DATE,
 };
 
 use axum::extract::Path;
@@ -14,6 +16,7 @@ use axum::{
 };
 use minijinja::context;
 use serde::Deserialize;
+use time::OffsetDateTime;
 use tower_cookies::{Cookie, Cookies};
 use tracing::error;
 
@@ -112,6 +115,50 @@ pub async fn faq(
     };
     let ctx = context! {common};
     Ok(Html(state.render_view("faq.html.j2", ctx)?))
+}
+
+// Due to how I'm handling fragment fetch POSTs in the client-side JS,
+// this comes in as query params rather than a form-urlencoded body.
+#[derive(Debug, Deserialize)]
+pub struct PersonalMarkParams {
+    csrf_token: String,
+}
+
+#[tracing::instrument]
+pub async fn post_fragment_personalmark(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Form(params): Form<PersonalMarkParams>,
+) -> WebResult<(StatusCode, Html<String>)> {
+    if params.csrf_token != auth.session.csrf_token {
+        return Err(WebError {
+            message: r#"The bookmarklet generate button was stale or mangled.
+                Refresh the page and try generating again."#
+                .to_string(),
+            status: StatusCode::BAD_REQUEST,
+        });
+    }
+    // Skip an alloc w/ format_into:
+    let mut comment_bytes: Vec<u8> = "Personal bookmarklet created ".into();
+    OffsetDateTime::now_utc().format_into(&mut comment_bytes, SHORT_DATE)?;
+    let comment = String::from_utf8(comment_bytes)?;
+    // New token:
+    let (_, token_cleartext) = state
+        .db
+        .tokens()
+        .create(auth.user.id, TokenScope::WriteDogears, Some(&comment))
+        .await?;
+    // Build bookmarklet URL:
+    let bookmarklet_url = state.render_bookmarklet("mark.js.j2", Some(&token_cleartext))?;
+    // Render html fragment:
+    let personal_mark = PersonalMark {
+        bookmarklet_url: &bookmarklet_url,
+    };
+    let ctx = context! { personal_mark };
+    Ok((
+        StatusCode::CREATED,
+        Html(state.render_view("fragment.personalmark.html.j2", ctx)?),
+    ))
 }
 
 /// The account page. Requires logged-in.

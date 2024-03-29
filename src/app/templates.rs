@@ -81,6 +81,11 @@ pub struct DogearsList<'a> {
 }
 
 #[derive(Serialize)]
+pub struct PersonalMark<'a> {
+    pub bookmarklet_url: &'a str,
+}
+
+#[derive(Serialize)]
 pub struct MarkedPage<'a> {
     pub updated_dogears: &'a [Dogear],
     pub bookmarked_url: &'a str,
@@ -146,6 +151,10 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
         include_str!("../../templates/fragment.tokens.html.j2"),
     )?;
     env.add_template(
+        "fragment.personalmark.html.j2",
+        include_str!("../../templates/fragment.personalmark.html.j2"),
+    )?;
+    env.add_template(
         "index.html.j2",
         include_str!("../../templates/index.html.j2"),
     )?;
@@ -156,6 +165,10 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
     env.add_template(
         "login.html.j2",
         include_str!("../../templates/login.html.j2"),
+    )?;
+    env.add_template(
+        "macro.bookmarklet.html.j2",
+        include_str!("../../templates/macro.bookmarklet.html.j2"),
     )?;
     env.add_template(
         "macro.pagination.html.j2",

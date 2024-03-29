@@ -1,0 +1,17 @@
+{% macro bookmarklet(name, id, url) %}
+<div class="bookmarklet">
+  <h3 class="only desktop">» <span class="cartouche"><a href="{{url}}">🐶 {{name}}</a></span> «</h3>
+
+  <div class="only ios android">
+    <button type="button" class="copy-button" data-copy-target="bookmarklet-text-{{id}}" data-status-ready="👯‍♀️" data-status-success="✅" data-status-fail="❓"><span class="status">👯‍♀️</span> Copy to clipboard</button>
+
+    <textarea
+      id="bookmarklet-text-{{id}}"
+      readonly
+      rows="3"
+      cols="20"
+      spellcheck="false"
+    >{{url}}</textarea>
+  </div>
+</div>
+{% endmacro %}
