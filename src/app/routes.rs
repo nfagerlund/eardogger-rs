@@ -161,6 +161,24 @@ pub async fn post_fragment_personalmark(
     ))
 }
 
+#[tracing::instrument]
+pub async fn install(
+    State(state): State<DogState>,
+    maybe_auth: Option<AuthSession>,
+) -> WebResult<Html<String>> {
+    let title = "Install";
+    let common = match maybe_auth {
+        Some(ref auth) => auth.common_args(title),
+        None => Common::anonymous(title),
+    };
+    let where_was = state.render_bookmarklet("where.js.j2", None)?;
+    let install_page = InstallPage {
+        where_was_i_bookmarklet_url: &where_was,
+    };
+    let ctx = context! { common, install_page };
+    Ok(Html(state.render_view("install.html.j2", ctx)?))
+}
+
 /// The account page. Requires logged-in.
 #[tracing::instrument]
 pub async fn account(

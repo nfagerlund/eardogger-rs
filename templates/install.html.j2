@@ -1,5 +1,6 @@
-{# The install page. currently broken, pending bookmarklet features. #}
-{# Context: common: Common #}
+{# The install page. #}
+{# Context: common: Common, install_page: InstallPage #}
+{% from "macro.bookmarklet.html.j2" import bookmarklet %}
 {% extends "_layout.html.j2" %}
 {% block body %}
 <h2 id="install">Install the Eardogger Bookmarklet(s)</h2>
@@ -56,8 +57,8 @@
   </div>
 
   <div id="generate-personal-bookmarklet-fragment">
-    {% if user %}
-      <button id="generate-personal-bookmarklet" type="button">Generate personal bookmarklet</button>
+    {% if common.user %}
+      <button id="generate-personal-bookmarklet" type="button" data-csrf-token="{{common.csrf_token}}">Generate personal bookmarklet</button>
     {% else %}
       <p><span class="cartouche" style="display: inline-block;">(If you were logged in, this would be the "Generate" button.)</span></p>
     {% endif %}
@@ -111,15 +112,6 @@
     instead of the personal bookmarklet you generated above.
   </p>
 
-  {# TODO: bookmarklet fragment!! #}
-  {#
-
-  {{> bookmarklet
-    bookmarklet=where
-    name="Where was I?"
-    id="where"
-  }}
-
-  #}
+  {{ bookmarklet(name="Where was I?", id="where", url=install_page.where_was_i_bookmarklet_url) }}
 </section>
 {% endblock body %}

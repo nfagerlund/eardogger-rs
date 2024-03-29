@@ -154,7 +154,7 @@ document.addEventListener('click', function(e){
   } else if (that.matches('#generate-personal-bookmarklet')) {
     // This one's a one-off, so just hardcode everything.
     replaceFragment(
-      '/fragments/personalmark',
+      '/fragments/personalmark?csrf_token=' + encodeURIComponent(that.getAttribute('data-csrf-token')),
       '/install',
       'generate-personal-bookmarklet-fragment',
       that,

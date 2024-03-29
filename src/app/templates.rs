@@ -86,6 +86,11 @@ pub struct PersonalMark<'a> {
 }
 
 #[derive(Serialize)]
+pub struct InstallPage<'a> {
+    pub where_was_i_bookmarklet_url: &'a str,
+}
+
+#[derive(Serialize)]
 pub struct MarkedPage<'a> {
     pub updated_dogears: &'a [Dogear],
     pub bookmarked_url: &'a str,
