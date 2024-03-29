@@ -26,8 +26,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 lazy_static! {
-    static ref COMMENTED_LINES: Regex = Regex::new(r#"^\s*//.*\n"#).unwrap();
-    static ref LEADING_SPACE: Regex = Regex::new(r#"^\s+"#).unwrap();
+    static ref COMMENTED_LINES: Regex = Regex::new(r#"(?m)^\s*//.*\n"#).unwrap();
+    static ref LEADING_SPACE: Regex = Regex::new(r#"(?m)^\s+"#).unwrap();
     static ref LINE_ENDINGS: Regex = Regex::new(r#"\s*\n"#).unwrap();
     static ref SPACE_RUNS: Regex = Regex::new(r#"\s{2,}"#).unwrap();
 }
@@ -46,4 +46,33 @@ pub fn make_bookmarklet(js: &str) -> String {
     let wip = LINE_ENDINGS.replace_all(&wip, "");
     let wip = SPACE_RUNS.replace_all(&wip, " ");
     format!("javascript:{}", encode_uri_component(&wip))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Do most of make_bookmarklet, but don't url-escape, so it's easier to verify
+    // the regexes are working as intended.
+    pub fn minify_js(js: &str) -> String {
+        let wip = COMMENTED_LINES.replace_all(js, "");
+        let wip = LEADING_SPACE.replace_all(&wip, "");
+        let wip = LINE_ENDINGS.replace_all(&wip, "");
+        let wip = SPACE_RUNS.replace_all(&wip, " ");
+        wip.to_string()
+    }
+
+    #[test]
+    fn make_em() {
+        let some_js = r#"// first comment
+// second comment
+// third comment yey
+
+(() => {
+    console.log("sup");
+})();"#;
+        let some_min = minify_js(some_js);
+        let expected = r#"(() => {console.log("sup");})();"#;
+        assert_eq!(some_min, expected);
+    }
 }
