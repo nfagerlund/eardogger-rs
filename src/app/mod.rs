@@ -32,6 +32,7 @@ pub fn eardogger_app(state: DogState) -> Router {
         .route("/changepassword", post(post_changepassword))
         .route("/fragments/dogears", get(fragment_dogears))
         .route("/fragments/tokens", get(fragment_tokens))
+        .route("/fragments/personalmark", post(post_fragment_personalmark))
         .route("/tokens/:id", delete(delete_token))
         .layer(session_auth)
         .layer(CookieManagerLayer::new())
