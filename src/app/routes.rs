@@ -128,7 +128,7 @@ pub struct PersonalMarkParams {
 pub async fn post_fragment_personalmark(
     State(state): State<DogState>,
     auth: AuthSession,
-    Form(params): Form<PersonalMarkParams>,
+    Query(params): Query<PersonalMarkParams>,
 ) -> WebResult<(StatusCode, Html<String>)> {
     if params.csrf_token != auth.session.csrf_token {
         return Err(WebError {
