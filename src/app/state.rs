@@ -40,7 +40,7 @@ impl DSInner {
 
     /// Render a bookmarklet template into a `javascript:` URL.
     #[tracing::instrument]
-    pub fn render_bookmarklet<S: Serialize + std::fmt::Debug>(
+    pub fn render_bookmarklet(
         &self,
         name: &str,
         token: Option<&str>,
