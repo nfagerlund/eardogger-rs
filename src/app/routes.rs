@@ -400,11 +400,11 @@ pub async fn post_login(
     // just go to the home page.
     let mut redirect_to = state
         .config
-        .own_origin
+        .own_url
         .join(&params.return_to)
-        .unwrap_or_else(|_| state.config.own_origin.clone());
-    if redirect_to.origin() != state.config.own_origin.origin() {
-        redirect_to = state.config.own_origin.clone();
+        .unwrap_or_else(|_| state.config.own_url.clone());
+    if redirect_to.origin() != state.config.own_url.origin() {
+        redirect_to = state.config.own_url.clone();
     }
 
     // then, authenticate user and tack on a session cookie.

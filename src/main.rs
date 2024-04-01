@@ -52,11 +52,11 @@ async fn main() -> anyhow::Result<()> {
     // TODO: extract all this into more convenient... stuffs...
     let db = Db::new(pool);
     // TODO: get own_origin and assets_dir from config instead
-    let own_origin = Url::parse("http://localhost:3000")?;
+    let own_url = Url::parse("http://localhost:3000")?;
     let assets_dir = "public".to_string();
     let config = DogConfig {
         is_prod: false,
-        own_origin,
+        own_url,
         assets_dir,
     };
     let templates = load_templates()?;

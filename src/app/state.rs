@@ -23,7 +23,7 @@ pub struct DSInner {
 pub struct DogConfig {
     pub is_prod: bool,
     /// The site's own base URL.
-    pub own_origin: Url,
+    pub own_url: Url,
     /// The directory with static CSS/JS/image assets.
     pub assets_dir: String,
 }
@@ -46,7 +46,7 @@ impl DSInner {
         token: Option<&str>,
     ) -> Result<String, minijinja::Error> {
         let ctx = minijinja::context! {
-            own_origin => &self.config.own_origin.as_str(),
+            own_origin => &self.config.own_url.origin().ascii_serialization(),
             token => token,
         };
         Ok(make_bookmarklet(
