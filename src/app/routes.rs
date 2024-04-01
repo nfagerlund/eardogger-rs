@@ -669,3 +669,31 @@ pub async fn api_delete(
         ))
     }
 }
+
+#[derive(Deserialize, Debug)]
+pub struct ApiCreatePayload {
+    prefix: String,
+    current: String,
+    display_name: Option<String>,
+}
+
+#[tracing::instrument]
+pub async fn api_create(
+    State(state): State<DogState>,
+    auth: AuthAny,
+    Json(payload): Json<ApiCreatePayload>,
+) -> ApiResult<(StatusCode, Json<Dogear>)> {
+    // Both manage and write are ok
+    auth.allowed_scopes(&[TokenScope::WriteDogears, TokenScope::ManageDogears])?;
+    let res = state
+        .db
+        .dogears()
+        .create(
+            auth.user().id,
+            &payload.prefix,
+            &payload.current,
+            payload.display_name.as_deref(),
+        )
+        .await?;
+    Ok((StatusCode::CREATED, Json(res)))
+}
