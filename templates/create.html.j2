@@ -26,6 +26,8 @@ Usually you just want the domain, like <code>comic.example.com/</code>. But if t
   <button type="button" id="change-prefix" style="display: none;">Customize</button>
   <textarea name="prefix" type="text" maxlength="300" rows="2" cols="10">{{create_page.bookmarked_url}}</textarea>
 
+  <input type="hidden" name="csrf_token" value="{{common.csrf_token}}" />
+
   <button type="submit" id="submit-dogear">Create new dogear</button>
 </form>
 {% endblock body %}
