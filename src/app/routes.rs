@@ -1,7 +1,7 @@
 use super::authentication::{AuthAny, AuthSession};
 use super::state::DogState;
 use super::templates::*;
-use super::web_result::{ApiResult, WebError, WebResult};
+use super::web_result::{ApiError, ApiResult, WebError, WebResult};
 use crate::db::{Dogear, TokenScope};
 use crate::util::{
     check_new_password, uuid_string, ListMeta, Pagination, COOKIE_LOGIN_CSRF, COOKIE_SESSION,
@@ -636,6 +636,7 @@ pub async fn api_list(
     auth: AuthAny,
     Query(params): Query<PaginationQuery>,
 ) -> ApiResult<Json<ApiDogearsList>> {
+    // Requires manage
     auth.allowed_scopes(&[TokenScope::ManageDogears])?;
     let (dogears, meta) = state
         .db
@@ -643,4 +644,28 @@ pub async fn api_list(
         .list(auth.user().id, params.page(), params.size())
         .await?;
     Ok(Json(ApiDogearsList::new(dogears, meta)))
+}
+
+#[tracing::instrument]
+pub async fn api_delete(
+    State(state): State<DogState>,
+    auth: AuthAny,
+    Path(id): Path<i64>,
+) -> ApiResult<StatusCode> {
+    // Requires manage
+    auth.allowed_scopes(&[TokenScope::ManageDogears])?;
+    if state
+        .db
+        .dogears()
+        .destroy(id, auth.user().id)
+        .await?
+        .is_some()
+    {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "dogear not found".to_string(),
+        ))
+    }
 }
