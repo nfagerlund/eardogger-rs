@@ -24,6 +24,8 @@ pub fn eardogger_app(state: DogState) -> Router {
     let session_auth = from_fn_with_state(state.clone(), session_middleware);
     Router::new()
         .route("/", get(root))
+        .route("/mark/:url", get(mark_url))
+        .route("/mark", post(post_mark))
         .route("/faq", get(faq))
         .route("/account", get(account))
         .route("/install", get(install))

@@ -101,6 +101,90 @@ pub async fn fragment_dogears(
     Ok(Html(state.render_view("fragment.dogears.html.j2", ctx)?))
 }
 
+/// The mark-some-url page. One of:
+/// - Updating existing dogear in slowmode (countdown to redirect).
+/// - Create new dogear from URL we haven't seen before.
+/// Can fall back to login page on logged out.
+#[tracing::instrument]
+pub async fn mark_url(
+    State(state): State<DogState>,
+    maybe_auth: Option<AuthSession>,
+    cookies: Cookies,
+    own_uri: Uri,
+    Path(url): Path<String>,
+) -> WebResult<Html<String>> {
+    let Some(auth) = maybe_auth else {
+        let path = own_uri.to_string();
+        return login_form(state, cookies, &path).await;
+    };
+    let dogears = state.db.dogears();
+    match dogears.update(auth.user.id, &url).await? {
+        Some(res) => {
+            let marked_page = MarkedPage {
+                updated_dogears: &res,
+                bookmarked_url: &url,
+                slowmode: true,
+            };
+            let common = auth.common_args("Saved your place");
+            let ctx = context! {marked_page, common};
+            Ok(Html(state.render_view("marked.html.j2", ctx)?))
+        }
+        None => {
+            let create_page = CreatePage {
+                bookmarked_url: &url,
+            };
+            let common = auth.common_args("Dogear this?");
+            let ctx = context! {create_page, common};
+            Ok(Html(state.render_view("create.html.j2", ctx)?))
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateParams {
+    display_name: Option<String>,
+    current: String,
+    prefix: String,
+    csrf_token: String,
+}
+
+/// A POST to the /mark form, which is displayed on the create page. This
+/// creates a new dogear, then displays the marked page (non-slowmode).
+#[tracing::instrument]
+pub async fn post_mark(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Form(params): Form<CreateParams>,
+) -> WebResult<Html<String>> {
+    if params.csrf_token != auth.session.csrf_token {
+        return Err(WebError {
+            message: r#"The create-new-dogear form was stale or mangled.
+                Go back, refresh that page, and try marking your spot again."#
+                .to_string(),
+            status: StatusCode::BAD_REQUEST,
+        });
+    }
+
+    let res = state
+        .db
+        .dogears()
+        .create(
+            auth.user.id,
+            &params.prefix,
+            &params.current,
+            params.display_name.as_deref(),
+        )
+        .await?;
+    let marked_page = MarkedPage {
+        updated_dogears: &[res],
+        bookmarked_url: &params.current,
+        slowmode: false,
+    };
+    let common = auth.common_args("Saved your place");
+    let ctx = context! {marked_page, common};
+    Ok(Html(state.render_view("marked.html.j2", ctx)?))
+}
+
 /// Display the faq/news/about page. This is almost a static page, but
 /// if there's a user around, we want them for the layout header.
 #[tracing::instrument]
