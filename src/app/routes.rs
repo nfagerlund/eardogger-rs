@@ -158,12 +158,12 @@ pub async fn post_mark(
     Form(params): Form<CreateParams>,
 ) -> WebResult<Html<String>> {
     if params.csrf_token != auth.session.csrf_token {
-        return Err(WebError {
-            message: r#"The create-new-dogear form was stale or mangled.
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            r#"The create-new-dogear form was stale or mangled.
                 Go back, refresh that page, and try marking your spot again."#
                 .to_string(),
-            status: StatusCode::BAD_REQUEST,
-        });
+        ));
     }
 
     let res = state
@@ -252,12 +252,12 @@ pub async fn post_fragment_personalmark(
     Query(params): Query<PersonalMarkParams>,
 ) -> WebResult<(StatusCode, Html<String>)> {
     if params.csrf_token != auth.session.csrf_token {
-        return Err(WebError {
-            message: r#"The bookmarklet generate button was stale or mangled.
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            r#"The bookmarklet generate button was stale or mangled.
                 Refresh the page and try generating again."#
                 .to_string(),
-            status: StatusCode::BAD_REQUEST,
-        });
+        ));
     }
     // Skip an alloc w/ format_into:
     let mut comment_bytes: Vec<u8> = "Personal bookmarklet created ".into();
@@ -504,18 +504,14 @@ pub async fn post_signup(
     signed_cookies.remove(csrf_cookie);
 
     if maybe_auth.is_some() {
-        return Err(WebError {
-            message:
-                "Can't sign up while you're still logged in. (How'd you even do that, by the way?)"
-                    .to_string(),
-            status: StatusCode::FORBIDDEN,
-        });
+        return Err(WebError::new(
+            StatusCode::FORBIDDEN,
+            "Can't sign up while you're still logged in. (How'd you even do that, by the way?)"
+                .to_string(),
+        ));
     }
     if let Err(e) = check_new_password(&params.new_password, &params.new_password_again) {
-        return Err(WebError {
-            message: e.to_string(),
-            status: StatusCode::BAD_REQUEST,
-        });
+        return Err(WebError::new(StatusCode::BAD_REQUEST, e.to_string()));
     }
     let user = state
         .db
@@ -548,29 +544,26 @@ pub async fn post_changepassword(
     Form(params): Form<ChangePasswordParams>,
 ) -> WebResult<Redirect> {
     if params.csrf_token != auth.session.csrf_token {
-        return Err(WebError {
-            message: r#"The change password form you tried to use was stale, or
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            r#"The change password form you tried to use was stale, or
                 had been tampered with. Go back to the account page and try
                 changing your password again."#
                 .to_string(),
-            status: StatusCode::BAD_REQUEST,
-        });
+        ));
     }
     if let Err(e) = check_new_password(&params.new_password, &params.new_password_again) {
-        return Err(WebError {
-            message: e.to_string(),
-            status: StatusCode::BAD_REQUEST,
-        });
+        return Err(WebError::new(StatusCode::BAD_REQUEST, e.to_string()));
     }
     let users = state.db.users();
     let Some(user) = users
         .authenticate(&auth.user.username, &params.password)
         .await?
     else {
-        return Err(WebError {
-            message: "Wrong existing password".to_string(),
-            status: StatusCode::BAD_REQUEST,
-        });
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            "Wrong existing password".to_string(),
+        ));
     };
     users
         .set_password(&user.username, &params.new_password)
