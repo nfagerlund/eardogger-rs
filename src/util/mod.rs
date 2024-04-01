@@ -94,7 +94,7 @@ impl ListMeta {
 
 /// Pagination details built from a ListMeta, useful when displaying
 /// page-turning controls in a template.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Pagination {
     pub current_page: u32,
     // The reason page_size is optional is so that you get cleaner URLs if

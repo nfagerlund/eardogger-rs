@@ -1,21 +1,21 @@
-use super::authentication::AuthSession;
+use super::authentication::{AuthAny, AuthSession};
 use super::state::DogState;
 use super::templates::*;
 use super::web_result::{WebError, WebResult};
-use crate::db::TokenScope;
+use crate::db::{Dogear, TokenScope};
 use crate::util::{
-    check_new_password, uuid_string, COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE,
-    SHORT_DATE,
+    check_new_password, uuid_string, ListMeta, Pagination, COOKIE_LOGIN_CSRF, COOKIE_SESSION,
+    PAGE_DEFAULT_SIZE, SHORT_DATE,
 };
 
 use axum::extract::Path;
 use axum::{
     extract::{Form, Query, State},
     http::{StatusCode, Uri},
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{Html, IntoResponse, Json, Redirect, Response},
 };
 use minijinja::context;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tower_cookies::{Cookie, Cookies};
 use tracing::error;
@@ -610,4 +610,84 @@ async fn login_form(state: DogState, cookies: Cookies, return_to: &str) -> WebRe
     cookies.signed(&state.cookie_key).add(csrf_cookie);
 
     Ok(Html(page))
+}
+
+#[derive(Debug)]
+pub struct ApiError {
+    message: String,
+    status: StatusCode,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ApiRawError {
+    error: String,
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (
+            self.status,
+            Json(ApiRawError {
+                error: self.message,
+            }),
+        )
+            .into_response()
+    }
+}
+// question-mark helper
+impl From<anyhow::Error> for ApiError {
+    fn from(value: anyhow::Error) -> Self {
+        Self {
+            message: value.to_string(),
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+impl From<WebError> for ApiError {
+    fn from(value: WebError) -> Self {
+        Self {
+            message: value.message,
+            status: value.status,
+        }
+    }
+}
+
+#[derive(Serialize, Debug)]
+pub struct ApiMeta {
+    pagination: Pagination,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ApiDogearsList {
+    data: Vec<Dogear>,
+    meta: ApiMeta,
+}
+
+impl ApiDogearsList {
+    fn new(dogears: Vec<Dogear>, list_meta: ListMeta) -> Self {
+        Self {
+            data: dogears,
+            meta: ApiMeta {
+                pagination: list_meta.to_pagination(),
+            },
+        }
+    }
+}
+
+// Hmm, possibly wanna refactor some of the api handler affordances once this is working right.
+// also, rn the auth extractors reject with WebError, which, maybe not right for api routes.
+// guess I could just maybe_auth em right here. come back to this!
+#[tracing::instrument]
+pub async fn api_list(
+    State(state): State<DogState>,
+    auth: AuthAny,
+    Query(params): Query<PaginationQuery>,
+) -> Result<Json<ApiDogearsList>, ApiError> {
+    auth.allowed_scopes(&[TokenScope::ManageDogears])?;
+    let (dogears, meta) = state
+        .db
+        .dogears()
+        .list(auth.user().id, params.page(), params.size())
+        .await?;
+    Ok(Json(ApiDogearsList::new(dogears, meta)))
 }

@@ -1,6 +1,6 @@
 use super::state::DogState;
 use super::web_result::WebError;
-use crate::db::{Db, Session, Token, User};
+use crate::db::{Db, Session, Token, TokenScope, User};
 use crate::util::COOKIE_SESSION;
 use axum::{
     async_trait,
@@ -34,6 +34,37 @@ pub enum AuthAny {
         user: Arc<User>,
         token: Arc<Token>,
     },
+}
+
+impl AuthAny {
+    /// A lil helper for throwing early-out 403 errors with the `?` operator,
+    /// in routes that only allow specific token scopes. We assume that a "real"
+    /// login session has a _superset_ of all possible token permissions for
+    /// that user, so session auth is always allowed through.
+    pub fn allowed_scopes(&self, scopes: &[TokenScope]) -> Result<(), WebError> {
+        match self {
+            AuthAny::Session { .. } => Ok(()),
+            AuthAny::Token { token, .. } => {
+                if scopes.iter().any(|s| *s == token.scope()) {
+                    Ok(())
+                } else {
+                    Err(WebError::new(
+                        StatusCode::FORBIDDEN,
+                        "The provided authentication token doesn't have the right permissions to perform this action.".to_string()),
+                    )
+                }
+            }
+        }
+    }
+
+    /// A lil helper for getting quick access to the authenticated user without
+    /// having to do a match.
+    pub fn user(&self) -> Arc<User> {
+        match self {
+            AuthAny::Session { user, .. } => user.clone(),
+            AuthAny::Token { user, .. } => user.clone(),
+        }
+    }
 }
 
 /// Only available as an extractor, the info in here is sourced from an
