@@ -1,14 +1,14 @@
 use super::state::DogState;
-use super::web_result::{ApiError, AppError, AppErrorKind, WebError};
-use crate::db::{Db, Session, Token, TokenScope, User};
+use super::web_result::{ApiError, AppError, AppErrorKind};
+use crate::db::{Session, Token, TokenScope, User};
 use crate::util::COOKIE_SESSION;
 use axum::{
     async_trait,
     extract::{FromRequestParts, Request, State},
-    http::{header, request::Parts, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use http::{header, request::Parts, HeaderMap, HeaderValue, StatusCode};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tower_cookies::Cookies;
@@ -40,7 +40,10 @@ impl AuthAny {
     /// A lil helper for throwing early-out 403 errors with the `?` operator,
     /// in routes that only allow specific token scopes. We assume that a "real"
     /// login session has a _superset_ of all possible token permissions for
-    /// that user, so session auth is always allowed through.
+    /// that user, so session auth is always allowed through. This always assumes
+    /// it's returning a JSON error, because it only errors if you _actually_
+    /// provided a valid token, which means you're well on your way to doing an
+    /// api request.
     pub fn allowed_scopes(&self, scopes: &[TokenScope]) -> Result<(), ApiError> {
         match self {
             AuthAny::Session { .. } => Ok(()),
@@ -87,6 +90,30 @@ impl AuthSession {
     }
 }
 
+// Checks both the Accept and Content-Type (in case of POST/PUT) headers to
+// see if we should be returning json error objects; defaults to html otherwise.
+fn error_kind_from_headers(headers: &HeaderMap<HeaderValue>) -> AppErrorKind {
+    if let Some(v) = headers.get(http::header::ACCEPT) {
+        if header_val_matches(v, "application/json") {
+            return AppErrorKind::Json;
+        }
+    }
+    if let Some(v) = headers.get(http::header::CONTENT_TYPE) {
+        if header_val_matches(v, "application/json") {
+            return AppErrorKind::Json;
+        }
+    }
+    AppErrorKind::Html
+}
+
+// True if the header value is a valid string AND equals the provided text.
+fn header_val_matches(val: &HeaderValue, text: &str) -> bool {
+    match val.to_str() {
+        Ok(matchable) => matchable == text,
+        Err(_) => false,
+    }
+}
+
 // These extractors rely on the session and token middlewares being present in
 // the stack. If they're not around, it always whiffs.
 #[async_trait]
@@ -94,15 +121,20 @@ impl<S> FromRequestParts<S> for AuthAny
 where
     S: Send + Sync + Debug,
 {
-    type Rejection = WebError;
+    type Rejection = AppError;
 
     #[tracing::instrument]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // We default to HTML error pages... but if this is specifically a json request,
+        // we'll remember to render json errors later.
+        let kind = error_kind_from_headers(&parts.headers);
+
         match parts.extensions.get::<AuthAny>() {
             Some(aa) => Ok(aa.clone()),
-            None => Err(WebError::new(
+            None => Err(AppError::new(
                 StatusCode::UNAUTHORIZED,
-                "Either you aren't logged in, you forgot to pass a token, or your token is no longer valid.".to_string()
+                "Either you aren't logged in, you forgot to pass a token, or your token is no longer valid.".to_string(),
+                kind,
             )),
         }
     }
@@ -113,19 +145,24 @@ impl<S> FromRequestParts<S> for AuthSession
 where
     S: Send + Sync + Debug,
 {
-    type Rejection = WebError;
+    type Rejection = AppError;
 
     #[tracing::instrument]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // We default to HTML error pages... but if this is specifically a json request,
+        // we'll remember to render json errors later.
+        let kind = error_kind_from_headers(&parts.headers);
+
         if let Some(AuthAny::Session { user, session }) = parts.extensions.get::<AuthAny>() {
             Ok(AuthSession {
                 user: user.clone(),
                 session: session.clone(),
             })
         } else {
-            Err(WebError::new(
+            Err(AppError::new(
                 StatusCode::UNAUTHORIZED,
-                "You aren't logged in, so you can't do this. Go back and reload the page to start over.".to_string()
+                "You aren't logged in, so you can't do this. Go back and reload the page to start over.".to_string(),
+                kind,
             ))
         }
     }
@@ -156,6 +193,8 @@ pub async fn session_middleware(
     mut request: Request,
     next: Next,
 ) -> Response {
+    let error_kind = error_kind_from_headers(request.headers());
+
     // get sessid out of cookie
     if let Some(sessid) = cookies.get(COOKIE_SESSION) {
         match state.db.sessions().authenticate(sessid.value()).await {
@@ -173,7 +212,8 @@ pub async fn session_middleware(
             }
             Err(e) => {
                 // If this hit a DB error, the site can't do much, so feel free to bail.
-                return WebError::from(e).into_response();
+                return AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string(), error_kind)
+                    .into_response();
             }
         }
     }
@@ -190,6 +230,10 @@ pub async fn token_middleware(
     mut request: Request,
     next: Next,
 ) -> Response {
+    // Actually this'll pretty much always be json if you're providing a token...
+    // but hey, no harm in checking.
+    let error_kind = error_kind_from_headers(request.headers());
+
     if let Some(auth_header) = request.headers().get(header::AUTHORIZATION) {
         if let Ok(auth_val) = auth_header.to_str() {
             if let Some(bearer_val) = auth_val.strip_prefix("Bearer ") {
@@ -208,7 +252,12 @@ pub async fn token_middleware(
                     }
                     Err(e) => {
                         // If this hit a DB error, the site can't do much, so feel free to bail.
-                        return WebError::from(e).into_response();
+                        return AppError::new(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            e.to_string(),
+                            error_kind,
+                        )
+                        .into_response();
                     }
                 }
             }
@@ -216,14 +265,4 @@ pub async fn token_middleware(
     }
     // Ok, carry on
     next.run(request).await
-}
-
-/// Small helper to obscure DB error text from users in production.
-fn db_error_response_tuple(e: anyhow::Error, is_prod: bool) -> (StatusCode, String) {
-    let msg = if is_prod {
-        "Something's broken on the server, sorry!".to_string()
-    } else {
-        format!("DB error: {}", e)
-    };
-    (StatusCode::INTERNAL_SERVER_ERROR, msg)
 }
