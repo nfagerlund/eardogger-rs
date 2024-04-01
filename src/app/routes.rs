@@ -14,11 +14,13 @@ use axum::{
     http::{StatusCode, Uri},
     response::{Html, IntoResponse, Json, Redirect, Response},
 };
+use http::{header, HeaderMap, HeaderValue};
 use minijinja::context;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tower_cookies::{Cookie, Cookies};
 use tracing::error;
+use url::Url;
 
 #[derive(Deserialize, Debug)]
 pub struct PaginationQuery {
@@ -696,4 +698,100 @@ pub async fn api_create(
         )
         .await?;
     Ok((StatusCode::CREATED, Json(res)))
+}
+
+// Mutates a HeaderMap in-place to set the necessary CORS headers for a given
+// origin. This is hardcoded for the needs of the /api/v1/update endpoint,
+// because it's literally the only thing we do that needs cors, so it's not
+// worth investing in tower-http's CorsLayer yet.
+fn set_cors_headers_for_api_update(
+    headers: &mut HeaderMap,
+    origin: &str,
+) -> Result<(), <HeaderValue as std::str::FromStr>::Err> {
+    headers.insert(header::VARY, "Origin".parse()?);
+    // First off, we no longer do cookie auth on CORS, it's tokens or the highway. So:
+    headers.insert(header::ACCESS_CONTROL_ALLOW_CREDENTIALS, "false".parse()?);
+    // Whoever you are: u are valid. (Actually, I think we could get away
+    // with *, now that we're not accepting credentials. Nevertheless,)
+    headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin.parse()?);
+    headers.insert(header::ACCESS_CONTROL_ALLOW_METHODS, "POST".parse()?);
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_HEADERS,
+        "Content-Type, Authorization, Content-Length, X-Requested-With".parse()?,
+    );
+    Ok(())
+}
+
+#[tracing::instrument]
+pub async fn api_update_cors_preflight(
+    State(state): State<DogState>,
+    req_headers: HeaderMap,
+) -> ApiResult<(StatusCode, HeaderMap)> {
+    // At this point, there might or might not be an API token or session auth in
+    // play. We're not really gonna care until we reach the actual POST, tho.
+    // Just answer _as though_ they were properly auth'd.
+    let mut res_headers = HeaderMap::new();
+
+    if let Some(origin) = req_headers.get(header::ORIGIN) {
+        if let Ok(origin) = origin.to_str() {
+            if origin != state.config.own_url.origin().ascii_serialization() {
+                // Then it's a CORS-eligible cross-origin request! Tack on them headers.
+                set_cors_headers_for_api_update(&mut res_headers, origin)?
+            }
+        }
+    }
+
+    Ok((StatusCode::NO_CONTENT, res_headers))
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ApiUpdatePayload {
+    current: String,
+}
+
+#[tracing::instrument]
+pub async fn api_update(
+    State(state): State<DogState>,
+    req_headers: HeaderMap,
+    auth: AuthAny,
+    Json(payload): Json<ApiUpdatePayload>,
+) -> ApiResult<(HeaderMap, Json<Vec<Dogear>>)> {
+    // Both write and manage tokens are ok here.
+    auth.allowed_scopes(&[TokenScope::WriteDogears, TokenScope::ManageDogears])?;
+
+    let mut res_headers = HeaderMap::new();
+
+    if let Some(origin) = req_headers.get(header::ORIGIN) {
+        if let Ok(origin) = origin.to_str() {
+            if origin != state.config.own_url.origin().ascii_serialization() {
+                // Then it's a CORS-eligible cross-origin request!
+
+                // OK, first, CORS ACCESS CHECK.
+                // Requests from other sites may only update your bookmark on THAT site.
+                let to_bookmark = Url::parse(&payload.current)?;
+                if to_bookmark.origin().ascii_serialization() != origin {
+                    return Err(ApiError::new(
+                        StatusCode::NOT_FOUND,
+                        "dogear not found".to_string(),
+                    ));
+                }
+
+                // Ok, looks like we're good to go. Tack on them headers.
+                set_cors_headers_for_api_update(&mut res_headers, origin)?
+            }
+        }
+    }
+
+    match state
+        .db
+        .dogears()
+        .update(auth.user().id, &payload.current)
+        .await?
+    {
+        Some(ds) => Ok((res_headers, Json(ds))),
+        None => Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "dogear not found".to_string(),
+        )),
+    }
 }

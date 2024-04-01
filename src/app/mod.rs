@@ -42,6 +42,10 @@ pub fn eardogger_app(state: DogState) -> Router {
         .route("/api/v1/list", get(api_list))
         .route("/api/v1/dogear/:id", delete(api_delete))
         .route("/api/v1/create", post(api_create))
+        .route(
+            "/api/v1/update",
+            post(api_update).options(api_update_cors_preflight),
+        )
         .layer(token_auth) // inner, so can override session.
         .layer(session_auth)
         .layer(CookieManagerLayer::new())
