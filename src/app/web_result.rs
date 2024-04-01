@@ -30,7 +30,6 @@ use axum::{
     Json,
 };
 use serde::Serialize;
-use std::error::Error;
 
 /// An IntoResponse-implementing type that can display error content as either
 /// an HTML error page, or a JSON error object. By using wrapper types that

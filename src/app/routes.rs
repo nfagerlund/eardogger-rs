@@ -1,7 +1,7 @@
 use super::authentication::{AuthAny, AuthSession};
 use super::state::DogState;
 use super::templates::*;
-use super::web_result::{ApiError, ApiResult, WebError, WebResult};
+use super::web_result::{ApiResult, WebError, WebResult};
 use crate::db::{Dogear, TokenScope};
 use crate::util::{
     check_new_password, uuid_string, ListMeta, Pagination, COOKIE_LOGIN_CSRF, COOKIE_SESSION,
@@ -635,7 +635,7 @@ pub async fn api_list(
     State(state): State<DogState>,
     auth: AuthAny,
     Query(params): Query<PaginationQuery>,
-) -> Result<Json<ApiDogearsList>, ApiError> {
+) -> ApiResult<Json<ApiDogearsList>> {
     auth.allowed_scopes(&[TokenScope::ManageDogears])?;
     let (dogears, meta) = state
         .db

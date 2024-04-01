@@ -1,6 +1,5 @@
 use super::users::User;
 use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta};
-use anyhow::anyhow;
 use serde::Serialize;
 use sqlx::{query, query_as, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};

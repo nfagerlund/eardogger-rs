@@ -61,7 +61,7 @@ pub struct ListMeta {
 }
 
 impl ListMeta {
-    pub fn to_pagination(&self) -> Pagination {
+    pub fn to_pagination(self) -> Pagination {
         let total_pages = self.count.div_ceil(self.size);
         // page 0 isn't a thing:
         let current_page = self.page.max(1);

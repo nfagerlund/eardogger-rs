@@ -33,6 +33,8 @@ impl Db {
         Self { pool }
     }
 
+    // this is for tests, of course it's dead in real builds.
+    #[allow(dead_code)]
     pub async fn new_test_db() -> Self {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         sqlx::migrate!("./migrations")
