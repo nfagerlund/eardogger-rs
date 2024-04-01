@@ -1,7 +1,7 @@
 use super::authentication::{AuthAny, AuthSession};
 use super::state::DogState;
 use super::templates::*;
-use super::web_result::{WebError, WebResult};
+use super::web_result::{ApiError, ApiResult, WebError, WebResult};
 use crate::db::{Dogear, TokenScope};
 use crate::util::{
     check_new_password, uuid_string, ListMeta, Pagination, COOKIE_LOGIN_CSRF, COOKIE_SESSION,
@@ -603,46 +603,6 @@ async fn login_form(state: DogState, cookies: Cookies, return_to: &str) -> WebRe
     cookies.signed(&state.cookie_key).add(csrf_cookie);
 
     Ok(Html(page))
-}
-
-#[derive(Debug)]
-pub struct ApiError {
-    message: String,
-    status: StatusCode,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ApiRawError {
-    error: String,
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        (
-            self.status,
-            Json(ApiRawError {
-                error: self.message,
-            }),
-        )
-            .into_response()
-    }
-}
-// question-mark helper
-impl From<anyhow::Error> for ApiError {
-    fn from(value: anyhow::Error) -> Self {
-        Self {
-            message: value.to_string(),
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-        }
-    }
-}
-impl From<WebError> for ApiError {
-    fn from(value: WebError) -> Self {
-        Self {
-            message: value.message,
-            status: value.status,
-        }
-    }
 }
 
 #[derive(Serialize, Debug)]

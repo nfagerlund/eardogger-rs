@@ -1,5 +1,5 @@
 use super::state::DogState;
-use super::web_result::WebError;
+use super::web_result::{ApiError, AppError, AppErrorKind, WebError};
 use crate::db::{Db, Session, Token, TokenScope, User};
 use crate::util::COOKIE_SESSION;
 use axum::{
@@ -41,14 +41,14 @@ impl AuthAny {
     /// in routes that only allow specific token scopes. We assume that a "real"
     /// login session has a _superset_ of all possible token permissions for
     /// that user, so session auth is always allowed through.
-    pub fn allowed_scopes(&self, scopes: &[TokenScope]) -> Result<(), WebError> {
+    pub fn allowed_scopes(&self, scopes: &[TokenScope]) -> Result<(), ApiError> {
         match self {
             AuthAny::Session { .. } => Ok(()),
             AuthAny::Token { token, .. } => {
                 if scopes.iter().any(|s| *s == token.scope()) {
                     Ok(())
                 } else {
-                    Err(WebError::new(
+                    Err(ApiError::new(
                         StatusCode::FORBIDDEN,
                         "The provided authentication token doesn't have the right permissions to perform this action.".to_string()),
                     )

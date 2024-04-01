@@ -27,16 +27,82 @@
 use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
+    Json,
 };
+use serde::Serialize;
 use std::error::Error;
 
-/// An IntoResponse type that any error can be converted to, for displaying
-/// HTML error pages from a route.
+/// An IntoResponse-implementing type that can display error content as either
+/// an HTML error page, or a JSON error object. By using wrapper types that
+/// implement appropriate From traits, handlers can use the `?` operator to
+/// smoothly handle fallible operations like DB access or template rendering,
+/// and reserve any wordier error handling for the specific app logic they own.
 #[derive(Debug)]
-pub struct WebError {
+pub struct AppError {
     pub message: String,
     pub status: StatusCode,
+    pub kind: AppErrorKind,
 }
+
+#[derive(Debug)]
+pub enum AppErrorKind {
+    Html,
+    Json,
+}
+
+// A dumb Serialize wrapper for `{ "error":"blah blah" }` so I don't have to
+// use the dynamic json!() object macro. This is purely an implementation
+// detail of `AppError::into_response()`.
+#[derive(Serialize, Debug)]
+pub struct RawJsonError {
+    error: String,
+}
+
+impl AppError {
+    pub fn new(status: StatusCode, message: String, kind: AppErrorKind) -> Self {
+        Self {
+            status,
+            message,
+            kind,
+        }
+    }
+}
+
+impl IntoResponse for AppError {
+    // Depending on our error kind, return either an error html page or an error json object.
+    #[tracing::instrument]
+    fn into_response(self) -> Response {
+        match self.kind {
+            AppErrorKind::Html => {
+                let mut text = String::new();
+                // TODO: Probably would like to suppress detailed errors for prod.
+                text.push_str("<p>");
+                html_escape::encode_safe_to_string(&self.message, &mut text);
+                text.push_str("</p>");
+
+                let page = format!(include_str!("../../templates/_error.html"), &text);
+                (self.status, Html(page)).into_response()
+            }
+            AppErrorKind::Json => {
+                let Self {
+                    message, status, ..
+                } = self;
+                let body = RawJsonError { error: message };
+                (status, Json(body)).into_response()
+            }
+        }
+    }
+}
+
+// Now for the wrapper types! Each of these must implement:
+// - From<E> where E has some trait bound to sweep up all the errors we
+//   want to bubble. Unfortunately there's some awkwardness due to using
+//   anyhow::Error in some places, so right now that bound is ToString.
+// - IntoResponse (by just delegating to the inner AppError).
+
+/// An AppError wrapper type for handlers that return HTML web pages.
+#[derive(Debug)]
+pub struct WebError(pub AppError);
 
 /// A convenience type for returning probably an Ok(IntoResponse), or maybe
 /// an error page, from a route.
@@ -44,7 +110,7 @@ pub type WebResult<T> = Result<T, WebError>;
 
 impl WebError {
     pub fn new(status: StatusCode, message: String) -> Self {
-        Self { message, status }
+        Self(AppError::new(status, message, AppErrorKind::Html))
     }
 }
 
@@ -60,28 +126,43 @@ impl WebError {
 // I could reconsider that in the future by following what fasterthanlime did and
 // enforcing a side-trip through anyhow for all errors, or I could just deal.
 impl<E: ToString> From<E> for WebError {
-    // Build an html-fragment description of the error, to be included
-    // in an error page later.
     fn from(value: E) -> Self {
-        let mut message = String::new();
-        // TODO: Probably would like to suppress detailed errors for prod.
-        message.push_str("<p>");
-        html_escape::encode_safe_to_string(value.to_string(), &mut message);
-        message.push_str("</p>");
-
         // For quick-and-dirty error returns, use a default HTTP error code of 500.
         // This is almost always correct.
-        Self {
-            message,
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-        }
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, value.to_string())
     }
 }
 
 impl IntoResponse for WebError {
-    #[tracing::instrument]
     fn into_response(self) -> Response {
-        let page = format!(include_str!("../../templates/_error.html"), &self.message);
-        (self.status, Html(page)).into_response()
+        self.0.into_response()
+    }
+}
+
+/// An AppError wrapper type for routes that return JSON objects.
+#[derive(Debug)]
+pub struct ApiError(pub AppError);
+
+/// A convenience type for returning probably an Ok(IntoResponse), or maybe
+/// an error object, from a route.
+pub type ApiResult<T> = Result<T, ApiError>;
+
+impl ApiError {
+    pub fn new(status: StatusCode, message: String) -> Self {
+        Self(AppError::new(status, message, AppErrorKind::Json))
+    }
+}
+
+impl<E: ToString> From<E> for ApiError {
+    fn from(value: E) -> Self {
+        // For quick-and-dirty error returns, use a default HTTP error code of 500.
+        // This is almost always correct.
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, value.to_string())
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        self.0.into_response()
     }
 }
