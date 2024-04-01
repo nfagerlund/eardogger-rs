@@ -536,6 +536,7 @@ dependencies = [
  "busride-rs",
  "clap",
  "html-escape",
+ "http",
  "lazy_static",
  "minijinja",
  "percent-encoding",
