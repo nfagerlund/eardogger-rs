@@ -12,7 +12,7 @@ use axum::extract::Path;
 use axum::{
     extract::{Form, Query, State},
     http::{StatusCode, Uri},
-    response::{Html, Redirect},
+    response::{Html, IntoResponse, Redirect, Response},
 };
 use minijinja::context;
 use serde::Deserialize;
@@ -184,6 +184,42 @@ pub async fn post_mark(
     let common = auth.common_args("Saved your place");
     let ctx = context! {marked_page, common};
     Ok(Html(state.render_view("marked.html.j2", ctx)?))
+}
+
+/// Given a URL, do one of the following:
+/// - If there's an existing dogear, redirect straight to the currently marked page for it.
+/// - If not, render the create page.
+/// - If logged out, show the login page.
+/// Since this might be a Redirect OR a page, we need to return Result on the happy path
+/// and manually convert to it.
+#[tracing::instrument]
+pub async fn resume(
+    State(state): State<DogState>,
+    maybe_auth: Option<AuthSession>,
+    Path(url): Path<String>,
+    own_uri: Uri,
+    cookies: Cookies,
+) -> WebResult<Response> {
+    let Some(auth) = maybe_auth else {
+        let path = own_uri.to_string();
+        return Ok(login_form(state, cookies, &path).await?.into_response());
+    };
+    match state
+        .db
+        .dogears()
+        .current_for_site(auth.user.id, &url)
+        .await?
+    {
+        Some(current) => Ok(Redirect::to(&current).into_response()),
+        None => {
+            let create_page = CreatePage {
+                bookmarked_url: &url,
+            };
+            let common = auth.common_args("Dogear this?");
+            let ctx = context! {create_page, common};
+            Ok(Html(state.render_view("create.html.j2", ctx)?).into_response())
+        }
+    }
 }
 
 /// Display the faq/news/about page. This is almost a static page, but

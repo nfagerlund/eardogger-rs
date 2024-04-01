@@ -26,6 +26,7 @@ pub fn eardogger_app(state: DogState) -> Router {
         .route("/", get(root))
         .route("/mark/:url", get(mark_url))
         .route("/mark", post(post_mark))
+        .route("/resume/:url", get(resume))
         .route("/faq", get(faq))
         .route("/account", get(account))
         .route("/install", get(install))
