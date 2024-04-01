@@ -143,6 +143,22 @@ pub fn check_new_password(new1: &str, new2: &str) -> Result<(), NewPasswordError
     }
 }
 
+/// Axum's `Form` fields show up as `Some("")` if they're present but empty,
+/// but we have a few functions that want to be able to omit empty fields.
+/// So the convention is that they're marked as `Option<String>` in the relevant
+/// form params struct, and the downstream function that receives it can use this
+/// lil flatmapper to clean its inputs.
+pub fn clean_optional_form_field(maybe: Option<&str>) -> Option<&str> {
+    maybe.and_then(|e| {
+        let e = e.trim();
+        if e.is_empty() {
+            None
+        } else {
+            Some(e)
+        }
+    })
+}
+
 /// Trim any leading "m." or "www." subdomains off a hostname at the start
 /// of a string. (Generally you'll call this function with *most* of a URL,
 /// after first removing the scheme and the `://` separator.)
@@ -248,5 +264,21 @@ mod tests {
             normalize_prefix_matcher("ftp://www.m.example.com"),
             "ftp://www.m.example.com"
         );
+    }
+
+    use super::clean_optional_form_field;
+
+    #[test]
+    fn clean_optional_test() {
+        assert_eq!(clean_optional_form_field(None), None);
+        assert_eq!(
+            clean_optional_form_field(Some("you@example.com")),
+            Some("you@example.com")
+        );
+        assert_eq!(
+            clean_optional_form_field(Some("me@example.com ")),
+            Some("me@example.com")
+        );
+        assert_eq!(clean_optional_form_field(Some("")), None);
     }
 }

@@ -142,6 +142,7 @@ pub async fn mark_url(
 
 #[derive(Debug, Deserialize)]
 pub struct CreateParams {
+    // Dogears::create will normalize the Some("") case.
     display_name: Option<String>,
     current: String,
     prefix: String,

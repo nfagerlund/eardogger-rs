@@ -1,4 +1,7 @@
-use crate::util::{matchable_from_url, normalize_prefix_matcher, sqlite_offset, ListMeta};
+use crate::util::{
+    clean_optional_form_field, matchable_from_url, normalize_prefix_matcher, sqlite_offset,
+    ListMeta,
+};
 use anyhow::anyhow;
 use serde::Serialize;
 use sqlx::{query, query_as, SqlitePool};
@@ -45,6 +48,7 @@ impl<'a> Dogears<'a> {
                 "The provided URL doesn't match the provided prefix."
             ));
         }
+        let normalized_display_name = clean_optional_form_field(display_name);
 
         query_as!(
             Dogear,
@@ -56,7 +60,7 @@ impl<'a> Dogears<'a> {
             user_id,
             normalized_prefix,
             current,
-            display_name
+            normalized_display_name
         )
         .fetch_one(self.pool)
         .await

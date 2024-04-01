@@ -1,3 +1,5 @@
+use crate::util::clean_optional_form_field;
+
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -60,17 +62,6 @@ fn clean_username(username: &str) -> anyhow::Result<&str> {
         ))
     }
 }
-/// We want to be able to omit email, but HTML forms make that tricky. So, flatmap it!
-fn clean_email(email: Option<&str>) -> Option<&str> {
-    email.and_then(|e| {
-        let e = e.trim();
-        if e.is_empty() {
-            None
-        } else {
-            Some(e)
-        }
-    })
-}
 fn valid_password(password: &str) -> anyhow::Result<&str> {
     if password.is_empty() {
         Err(anyhow!("Empty password isn't allowed."))
@@ -94,7 +85,7 @@ impl<'a> Users<'a> {
         email: Option<&str>,
     ) -> anyhow::Result<User> {
         let username = clean_username(username)?;
-        let email = clean_email(email);
+        let email = clean_optional_form_field(email);
         let password = valid_password(password)?;
         let password_hash = bcrypt::hash(password, 12)?;
 
@@ -187,7 +178,7 @@ impl<'a> Users<'a> {
     /// will definitely flow all the way up to the frontend.
     #[tracing::instrument]
     pub async fn set_email(&self, username: &str, email: Option<&str>) -> anyhow::Result<()> {
-        let email = clean_email(email);
+        let email = clean_optional_form_field(email);
 
         let res = query!(
             r#"
@@ -222,21 +213,5 @@ impl<'a> Users<'a> {
         } else {
             Ok(None)
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::clean_email;
-
-    #[test]
-    fn clean_email_test() {
-        assert_eq!(clean_email(None), None);
-        assert_eq!(
-            clean_email(Some("you@example.com")),
-            Some("you@example.com")
-        );
-        assert_eq!(clean_email(Some("me@example.com ")), Some("me@example.com"));
-        assert_eq!(clean_email(Some("")), None);
     }
 }
