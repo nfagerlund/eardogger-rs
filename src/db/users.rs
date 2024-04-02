@@ -128,7 +128,6 @@ impl<'a> Users<'a> {
 
     /// Just fetch a user. Most app logic should use [`authenticate`] instead,
     /// but this is nice to have in tests.
-    #[tracing::instrument]
     pub async fn by_name(&self, username: &str) -> anyhow::Result<Option<User>> {
         Ok(self
             .by_name_with_password_hash(username)
@@ -176,7 +175,6 @@ impl<'a> Users<'a> {
     /// Set or clear the user's email. BTW, this and set_password take username
     /// instead of ID in order to give better errors, since these errors
     /// will definitely flow all the way up to the frontend.
-    #[tracing::instrument]
     pub async fn set_email(&self, username: &str, email: Option<&str>) -> anyhow::Result<()> {
         let email = clean_optional_form_field(email);
 
@@ -198,7 +196,6 @@ impl<'a> Users<'a> {
     }
 
     /// Returns Ok(Some) on success, Ok(None) on not-found.
-    #[tracing::instrument]
     pub async fn destroy(&self, id: i64) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"

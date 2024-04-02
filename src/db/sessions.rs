@@ -58,7 +58,6 @@ impl<'a> Sessions<'a> {
     /// cleanup operation that should happen as a background task rather than
     /// blocking a user request... but it should happen fairly often so the
     /// number of sessions to waste at once never gets very large.
-    #[tracing::instrument]
     pub async fn delete_expired(&self) -> anyhow::Result<u64> {
         // y'know, ideally I would like to set a limit for how many
         // records to waste at a time, just to guard against blowouts...
