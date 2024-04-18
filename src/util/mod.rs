@@ -183,8 +183,8 @@ fn trim_and_check_scheme(url: &str) -> anyhow::Result<&str> {
     };
     let scheme = parsed.scheme();
     if scheme == "http" || scheme == "https" {
-        let sliced = &url[scheme.len()..];
-        let sliced = &sliced["://".len()..];
+        let trim_len = scheme.len() + "://".len();
+        let sliced = &url[trim_len..];
         Ok(sliced)
     } else {
         Err(anyhow!(
