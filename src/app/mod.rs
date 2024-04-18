@@ -10,6 +10,7 @@ use state::DogState;
 pub use templates::load_templates;
 
 use axum::{
+    handler::HandlerWithoutStateExt,
     middleware::from_fn_with_state,
     routing::{delete, get, post},
     Router,
@@ -50,7 +51,10 @@ pub fn eardogger_app(state: DogState) -> Router {
         .layer(session_auth)
         .layer(CookieManagerLayer::new())
         // put static files and 404 outside the auth layers
-        .nest_service("/public", ServeDir::new(&state.config.assets_dir))
+        .nest_service(
+            "/public",
+            ServeDir::new(&state.config.assets_dir).not_found_service(four_oh_four.into_service()),
+        )
         .route("/status", get(status))
         .fallback(four_oh_four)
         .with_state(state)
