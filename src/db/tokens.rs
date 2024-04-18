@@ -49,7 +49,7 @@ impl PartialEq for Token {
 /// The exhaustive list of full permission types that API tokens can have.
 /// These values are stored in the database as text, but the application
 /// code can have a little enum. as a treat.
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TokenScope {
     /// Text: `write_dogears`.
     /// Can POST `/api/v1/create` and `/api/v1/update`.
