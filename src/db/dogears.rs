@@ -3,7 +3,7 @@ use crate::util::{
     ListMeta,
 };
 use anyhow::anyhow;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
 
@@ -14,7 +14,7 @@ pub struct Dogears<'a> {
 }
 
 /// A record struct for user web serial bookmarks.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Dogear {
     pub id: i64,
     pub user_id: i64,

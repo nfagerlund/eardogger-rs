@@ -29,7 +29,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
     Json,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// An IntoResponse-implementing type that can display error content as either
 /// an HTML error page, or a JSON error object. By using wrapper types that
@@ -50,11 +50,10 @@ pub enum AppErrorKind {
 }
 
 // A dumb Serialize wrapper for `{ "error":"blah blah" }` so I don't have to
-// use the dynamic json!() object macro. This is purely an implementation
-// detail of `AppError::into_response()`.
-#[derive(Serialize, Debug)]
+// use the dynamic json!() object macro.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RawJsonError {
-    error: String,
+    pub error: String,
 }
 
 impl AppError {

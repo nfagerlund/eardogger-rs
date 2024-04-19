@@ -607,15 +607,15 @@ async fn login_form(state: DogState, cookies: Cookies, return_to: &str) -> WebRe
     Ok(Html(page))
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ApiMeta {
-    pagination: Pagination,
+    pub pagination: Pagination,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ApiDogearsList {
-    data: Vec<Dogear>,
-    meta: ApiMeta,
+    pub data: Vec<Dogear>,
+    pub meta: ApiMeta,
 }
 
 impl ApiDogearsList {
