@@ -27,6 +27,15 @@ pub struct Db {
     pool: SqlitePool,
 }
 
+/// A helper struct for setting up data in tests.
+#[allow(dead_code)]
+pub struct TestUser {
+    pub name: String,
+    pub write_token: String,
+    pub manage_token: String,
+    pub session_id: String,
+}
+
 impl Db {
     /// yeah.
     pub fn new(pool: SqlitePool) -> Self {
@@ -42,6 +51,59 @@ impl Db {
             .await
             .expect("sqlx-ploded during migrations");
         Self::new(pool)
+    }
+
+    /// Test helper. Create a new user with:
+    /// - Provided name
+    /// - Password "aoeuhtns"
+    /// - A write token and a manage token
+    /// - An active login session
+    /// - Two bookmarks
+    #[allow(dead_code)]
+    pub async fn test_user(&self, name: &str) -> anyhow::Result<TestUser> {
+        let (users, tokens, sessions, dogears) =
+            (self.users(), self.tokens(), self.sessions(), self.dogears());
+        let email = format!("{}@example.com", name);
+
+        let user = users.create(name, "aoeuhtns", Some(&email)).await?;
+        let (_, write_token) = tokens
+            .create(
+                user.id,
+                TokenScope::WriteDogears,
+                Some("write token for test user"),
+            )
+            .await?;
+        let (_, manage_token) = tokens
+            .create(
+                user.id,
+                TokenScope::ManageDogears,
+                Some("manage token for test user"),
+            )
+            .await?;
+        let session = sessions.create(user.id).await?;
+        dogears
+            .create(
+                user.id,
+                "example.com/comic",
+                "https://example.com/comic/24",
+                Some("Example Comic"),
+            )
+            .await?;
+        dogears
+            .create(
+                user.id,
+                "example.com/serial",
+                "https://example.com/serial/4",
+                Some("Example Serial"),
+            )
+            .await?;
+
+        Ok(TestUser {
+            name: user.username,
+            write_token,
+            manage_token,
+            session_id: session.id,
+        })
     }
 
     pub fn users(&self) -> Users {

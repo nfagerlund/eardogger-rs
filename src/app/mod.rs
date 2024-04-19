@@ -1,3 +1,4 @@
+mod app_tests;
 mod authentication;
 mod routes;
 pub mod state;
