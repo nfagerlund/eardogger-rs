@@ -40,7 +40,11 @@ async fn main() -> anyhow::Result<()> {
     // Set up the database connection pool
     // TODO: extract DB url into config
     let db_url = "sqlite:dev.db";
-    let pool = db_connect(db_url).await?;
+    let cores = std::thread::available_parallelism()?.get() as u32;
+    // This is a low-traffic service running on shared hardware, so go easy on parallelism.
+    // Up to (cores - 2) threads, with a minimum of 2.
+    let max_readers = cores.saturating_sub(2).max(2);
+    let pool = db_pool(db_url, max_readers).await?;
     // TODO: migrations?
 
     // Set up the cookie key
@@ -101,16 +105,19 @@ async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
     }
 }
 
-async fn db_connect(db_url: &str) -> Result<SqlitePool, sqlx::Error> {
+async fn db_pool(db_url: &str, max_connections: u32) -> Result<SqlitePool, sqlx::Error> {
     let db_opts = SqliteConnectOptions::from_str(db_url)?;
     let db_opts = db_opts
         .journal_mode(SqliteJournalMode::Wal)
+        .busy_timeout(Duration::from_secs(5))
+        .pragma("temp_store", "memory")
         .optimize_on_close(true, 400)
         .synchronous(SqliteSynchronous::Normal) // usually fine w/ wal
         .foreign_keys(true);
     let pool_opts: PoolOptions<Sqlite> = PoolOptions::new()
-        .max_connections(50) // default's 10, seems low
+        .max_connections(max_connections) // default's 10, but we'll be explicit.
+        .min_connections(1)
         // boss makes a dollar, db thread makes a dime, that's why I fish crab on company time
-        .max_lifetime(Duration::from_secs(60 * 60 * 8));
+        .max_lifetime(Duration::from_secs(60 * 60 * 4));
     pool_opts.connect_with(db_opts).await
 }
