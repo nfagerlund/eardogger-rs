@@ -1,4 +1,4 @@
-use super::users::User;
+use super::{core::Db, users::User};
 use crate::util::{uuid_string, COOKIE_SESSION};
 use sqlx::{query, query_as, SqlitePool};
 use time::OffsetDateTime;
@@ -9,10 +9,10 @@ use tower_cookies::cookie::{Cookie, SameSite};
 /// be passed as a whole string param, not interpolated from an int.
 const SESSION_LIFETIME_MODIFIER: &str = "+90 days";
 
-/// A query helper type for operating on [Session]s. Usually rented from a [Db].
+/// A query helper type for operating on [Session]s.
 #[derive(Debug)]
 pub struct Sessions<'a> {
-    pool: &'a SqlitePool,
+    db: &'a Db,
 }
 
 /// A record struct for user login sessions.
@@ -50,8 +50,14 @@ impl Session {
 
 // create, authenticate, destroy, delete_expired
 impl<'a> Sessions<'a> {
-    pub fn new(pool: &'a SqlitePool) -> Self {
-        Self { pool }
+    pub fn new(db: &'a Db) -> Self {
+        Self { db }
+    }
+    fn read_pool(&self) -> &SqlitePool {
+        &self.db.read_pool
+    }
+    fn write_pool(&self) -> &SqlitePool {
+        &self.db.write_pool
     }
 
     /// Delete all expired sessions from the database. This is a low-priority
@@ -68,7 +74,7 @@ impl<'a> Sessions<'a> {
                 DELETE FROM sessions WHERE expires < datetime('now');
             "#
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await
         .map_err(|e| e.into())
         .map(|v| v.rows_affected())
@@ -92,7 +98,7 @@ impl<'a> Sessions<'a> {
             csrf_token,
             SESSION_LIFETIME_MODIFIER,
         )
-        .fetch_one(self.pool)
+        .fetch_one(self.write_pool())
         .await
         .map_err(|e| e.into())
     }
@@ -107,7 +113,7 @@ impl<'a> Sessions<'a> {
             "#,
             sessid,
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await?;
         if res.rows_affected() == 1 {
             Ok(Some(()))
@@ -130,7 +136,7 @@ impl<'a> Sessions<'a> {
             SESSION_LIFETIME_MODIFIER,
             sessid,
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await?;
 
         // Get the goods!!
@@ -149,7 +155,7 @@ impl<'a> Sessions<'a> {
             "#,
             sessid,
         )
-        .fetch_optional(self.pool)
+        .fetch_optional(self.read_pool())
         .await?;
 
         if let Some(stuff) = maybe {
