@@ -1,7 +1,7 @@
 use super::{core::Db, users::User};
 use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta};
 use serde::Serialize;
-use sqlx::{query, query_as, SqlitePool};
+use sqlx::{query, query_as, query_scalar, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
 
 /// A query helper type for operating on [Token]s. Usually rented from a [Db].
@@ -228,18 +228,18 @@ impl<'a> Tokens<'a> {
         // by default to return the value of COUNT() as an i32, which I
         // KNOW is not correct, so that column name with a colon overrides it
         // at the sqlx layer. I think.
-        let count = query!(
+        let count = query_scalar!(
             r#"
                 SELECT COUNT(id) AS 'count: u32' FROM tokens WHERE user_id = ?;
             "#,
             user_id,
         )
         .fetch_one(self.read_pool())
-        .await?
-        .count;
+        .await?;
+
+        let meta = ListMeta { count, page, size };
 
         let offset = sqlite_offset(page, size)?;
-        let meta = ListMeta { count, page, size };
         let list = query_as!(
             Token,
             r#"

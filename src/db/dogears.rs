@@ -6,7 +6,7 @@ use crate::util::{
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, SqlitePool};
+use sqlx::{query, query_as, query_scalar, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
 
 /// A query helper type for operating on [Dogears]. Usually rented from a [Db].
@@ -165,7 +165,7 @@ impl<'a> Dogears<'a> {
     ) -> anyhow::Result<(Vec<Dogear>, ListMeta)> {
         // Count first, as a separate query. Note the sqlx "type coersion inside
         // the column name" thing, sigh.
-        let count = query!(
+        let count = query_scalar!(
             r#"
                 SELECT count(id) AS 'count: u32' FROM dogears
                 WHERE user_id = ?;
@@ -173,11 +173,11 @@ impl<'a> Dogears<'a> {
             user_id,
         )
         .fetch_one(self.read_pool())
-        .await?
-        .count;
+        .await?;
+
+        let meta = ListMeta { count, page, size };
 
         let offset = sqlite_offset(page, size)?;
-        let meta = ListMeta { count, page, size };
         let list = query_as!(
             Dogear,
             r#"
