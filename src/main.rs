@@ -91,7 +91,10 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(cancel_on_terminate(cancel_token.clone()));
 
     // Spawn the stale session pruning worker, in the tracker
-    tracker.spawn(prune_stale_sessions_worker(db, cancel_token.clone()));
+    tracker.spawn(prune_stale_sessions_worker(
+        db.clone(),
+        cancel_token.clone(),
+    ));
 
     // Serve the website til we're done!
     // TODO: get network stuff from config, do multi-modal serving
@@ -110,6 +113,8 @@ async fn main() -> anyhow::Result<()> {
     info!("waiting for tasks to finish");
     tracker.close();
     tracker.wait().await;
+    db.read_pool.close().await;
+    db.write_pool.close().await;
     info!("see ya!");
 
     Ok(())
