@@ -10,7 +10,6 @@ use time::{format_description::FormatItem, macros::format_description};
 use url::Url;
 
 pub use bookmarklets::*;
-pub use url_encoding::*;
 
 // Constants
 /// A time crate format description, like this: 2024-3-22
