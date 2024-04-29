@@ -10,6 +10,7 @@ use sqlx::{
 };
 use std::str::FromStr;
 use std::time::Duration;
+use tokio_util::task::TaskTracker;
 
 /// The app's main database helper type. One of these goes in the app state,
 /// and you can use it to access all the various resource methods, namespaced
@@ -18,14 +19,17 @@ use std::time::Duration;
 pub struct Db {
     pub read_pool: SqlitePool,
     pub write_pool: SqlitePool,
+    // Query helpers may spawn SHORT-LIVED async tasks, so need a tracker but not a cancel token.
+    pub task_tracker: TaskTracker,
 }
 
 impl Db {
     /// yeah.
-    pub fn new(read_pool: SqlitePool, write_pool: SqlitePool) -> Self {
+    pub fn new(read_pool: SqlitePool, write_pool: SqlitePool, task_tracker: TaskTracker) -> Self {
         Self {
             read_pool,
             write_pool,
+            task_tracker,
         }
     }
 
@@ -71,7 +75,18 @@ impl Db {
             .await
             .expect("sqlx-ploded during migrations");
         let read_pool = write_pool.clone();
-        Self::new(read_pool, write_pool)
+        Self::new(read_pool, write_pool, TaskTracker::new())
+    }
+
+    /// Wait for any async writes to settle before continuing to test any
+    /// related conditions. This shouldn't ever be used in real operation,
+    /// because the task tracker will contain tasks that won't end until
+    /// shutdown time, but it's potentially useful in tests.
+    #[allow(dead_code)]
+    pub async fn test_flush_tasks(&self) {
+        self.task_tracker.close();
+        self.task_tracker.wait().await;
+        self.task_tracker.reopen();
     }
 
     /// Test helper. Create a new user with:

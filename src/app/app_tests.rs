@@ -3,6 +3,8 @@
 use axum::body::{to_bytes, Body};
 use http::{header, Request, Response, StatusCode};
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tower::{Service, ServiceExt}; // for `call`, `oneshot`, and `ready`
 use url::Url;
 
@@ -31,6 +33,8 @@ async fn test_state() -> DogState {
         config,
         templates,
         cookie_key: tower_cookies::Key::generate(),
+        task_tracker: TaskTracker::new(),
+        cancel_token: CancellationToken::new(),
     };
     Arc::new(inner)
 }

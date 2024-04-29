@@ -1,5 +1,7 @@
 use serde::Serialize;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tower_cookies::Key;
 use url::Url;
 
@@ -15,6 +17,8 @@ pub struct DSInner {
     pub config: DogConfig,
     pub templates: minijinja::Environment<'static>,
     pub cookie_key: Key,
+    pub task_tracker: TaskTracker,
+    pub cancel_token: CancellationToken,
 }
 
 /// Stuff that should be sourced from configuration, but for right now

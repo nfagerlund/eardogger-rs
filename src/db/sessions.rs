@@ -1,13 +1,15 @@
 use super::{core::Db, users::User};
 use crate::util::{uuid_string, COOKIE_SESSION};
 use sqlx::{query, query_as, SqlitePool};
+use time::Duration;
 use time::OffsetDateTime;
 use tower_cookies::cookie::{Cookie, SameSite};
+use tracing::error;
 
 /// The max duration a session cookie can idle between logins before
-/// it expires. Because of sqlite's phantom date/time types, this must
-/// be passed as a whole string param, not interpolated from an int.
-const SESSION_LIFETIME_MODIFIER: &str = "+90 days";
+/// it expires. We use a rolling window, so any logged-in activity
+/// resets the expiry timer.
+const SESSION_LIFETIME_DAYS: i64 = 90;
 
 /// A query helper type for operating on [Session]s.
 #[derive(Debug)]
@@ -85,18 +87,19 @@ impl<'a> Sessions<'a> {
     pub async fn create(&self, user_id: i64) -> anyhow::Result<Session> {
         let sessid = uuid_string();
         let csrf_token = uuid_string();
+        let new_expires = OffsetDateTime::now_utc() + Duration::days(SESSION_LIFETIME_DAYS);
         // ^^ theoretically I could stack-allocate that but ehhhh
         query_as!(
             Session,
             r#"
                 INSERT INTO sessions (id, user_id, csrf_token, expires)
-                VALUES (?1, ?2, ?3, datetime('now', ?4))
+                VALUES (?1, ?2, ?3, datetime(?4))
                 RETURNING id, user_id, csrf_token, expires;
             "#,
             sessid,
             user_id,
             csrf_token,
-            SESSION_LIFETIME_MODIFIER,
+            new_expires,
         )
         .fetch_one(self.write_pool())
         .await
@@ -127,26 +130,15 @@ impl<'a> Sessions<'a> {
     /// to maintain the rolling window.
     #[tracing::instrument]
     pub async fn authenticate(&self, sessid: &str) -> anyhow::Result<Option<(Session, User)>> {
-        // First do a fire-and-forget update, it's fine if it whiffs.
-        query!(
-            r#"
-                UPDATE sessions SET expires = datetime('now', ?1)
-                WHERE id = ?2 AND expires > datetime('now');
-            "#,
-            SESSION_LIFETIME_MODIFIER,
-            sessid,
-        )
-        .execute(self.write_pool())
-        .await?;
+        let new_expires = OffsetDateTime::now_utc() + Duration::days(SESSION_LIFETIME_DAYS);
 
-        // Get the goods!!
+        // First, get the stuff
         let maybe = query!(
             r#"
                 SELECT
                     sessions.id         AS session_id,
                     sessions.user_id    AS user_id,
                     sessions.csrf_token AS session_csrf_token,
-                    sessions.expires    AS session_expires,
                     users.username      AS user_username,
                     users.email         AS user_email,
                     users.created       AS user_created
@@ -158,22 +150,51 @@ impl<'a> Sessions<'a> {
         .fetch_optional(self.read_pool())
         .await?;
 
-        if let Some(stuff) = maybe {
-            let user = User {
-                id: stuff.user_id,
-                username: stuff.user_username,
-                email: stuff.user_email,
-                created: stuff.user_created,
-            };
-            let session = Session {
-                id: stuff.session_id,
-                user_id: stuff.user_id,
-                csrf_token: stuff.session_csrf_token,
-                expires: stuff.session_expires,
-            };
-            Ok(Some((session, user)))
-        } else {
-            Ok(None)
-        }
+        // Early out if we got nuthin; this also skips the async update.
+        let Some(stuff) = maybe else {
+            return Ok(None);
+        };
+
+        // Then, do a fire-and-forget update; we don't need to see the result in
+        // our read. This lets us skip waiting for the single
+        // writer thread in the warm path of "doing literally anything logged in."
+        let write_pool = self.write_pool().clone();
+        let owned_sessid = sessid.to_string();
+        self.db.task_tracker.spawn(async move {
+            let q_res = query!(
+                r#"
+                    UPDATE sessions SET expires = datetime(?1)
+                    WHERE id = ?2 AND expires > datetime('now');
+                "#,
+                new_expires,
+                owned_sessid,
+            )
+            .execute(&write_pool)
+            .await;
+
+            if let Err(e) = q_res {
+                error!(
+                    name: "Sessions::authenticate expiry update",
+                    "DB write failed for async update of session expiration: {}",
+                    e,
+                );
+            }
+        });
+
+        // Finally, assemble the stuff. sessions.expires is being updated async with the
+        // pre-calculated value, so we ignore the stored value and just return that.
+        let user = User {
+            id: stuff.user_id,
+            username: stuff.user_username,
+            email: stuff.user_email,
+            created: stuff.user_created,
+        };
+        let session = Session {
+            id: stuff.session_id,
+            user_id: stuff.user_id,
+            csrf_token: stuff.session_csrf_token,
+            expires: new_expires,
+        };
+        Ok(Some((session, user)))
     }
 }
