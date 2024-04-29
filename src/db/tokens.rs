@@ -158,7 +158,8 @@ impl<'a> Tokens<'a> {
         )
         .fetch_optional(self.read_pool())
         .await?;
-        // Early out if we got nuthin
+
+        // Early out if we got nuthin; this also skips the async update.
         let Some(stuff) = maybe else {
             return Ok(None);
         };

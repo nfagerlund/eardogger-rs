@@ -132,10 +132,32 @@ impl<'a> Sessions<'a> {
     pub async fn authenticate(&self, sessid: &str) -> anyhow::Result<Option<(Session, User)>> {
         let new_expires = OffsetDateTime::now_utc() + Duration::days(SESSION_LIFETIME_DAYS);
 
-        // First do a fire-and-forget update; we don't need to see the result in
-        // our read, and it's fine if it doesn't actually update anything due
-        // to the session being expired. This lets us skip waiting for the single
-        // DB writer thread in the warm path of "doing literally anything logged in."
+        // First, get the stuff
+        let maybe = query!(
+            r#"
+                SELECT
+                    sessions.id         AS session_id,
+                    sessions.user_id    AS user_id,
+                    sessions.csrf_token AS session_csrf_token,
+                    users.username      AS user_username,
+                    users.email         AS user_email,
+                    users.created       AS user_created
+                FROM sessions JOIN users ON sessions.user_id = users.id
+                WHERE sessions.id = ?1 AND sessions.expires > datetime('now');
+            "#,
+            sessid,
+        )
+        .fetch_optional(self.read_pool())
+        .await?;
+
+        // Early out if we got nuthin; this also skips the async update.
+        let Some(stuff) = maybe else {
+            return Ok(None);
+        };
+
+        // Then, do a fire-and-forget update; we don't need to see the result in
+        // our read. This lets us skip waiting for the single
+        // writer thread in the warm path of "doing literally anything logged in."
         let write_pool = self.write_pool().clone();
         let owned_sessid = sessid.to_string();
         self.db.task_tracker.spawn(async move {
@@ -159,41 +181,20 @@ impl<'a> Sessions<'a> {
             }
         });
 
-        // Get the goods!! sessions.expires is being updated async with the
+        // Finally, assemble the stuff. sessions.expires is being updated async with the
         // pre-calculated value, so we ignore the stored value and just return that.
-        let maybe = query!(
-            r#"
-                SELECT
-                    sessions.id         AS session_id,
-                    sessions.user_id    AS user_id,
-                    sessions.csrf_token AS session_csrf_token,
-                    users.username      AS user_username,
-                    users.email         AS user_email,
-                    users.created       AS user_created
-                FROM sessions JOIN users ON sessions.user_id = users.id
-                WHERE sessions.id = ?1 AND sessions.expires > datetime('now');
-            "#,
-            sessid,
-        )
-        .fetch_optional(self.read_pool())
-        .await?;
-
-        if let Some(stuff) = maybe {
-            let user = User {
-                id: stuff.user_id,
-                username: stuff.user_username,
-                email: stuff.user_email,
-                created: stuff.user_created,
-            };
-            let session = Session {
-                id: stuff.session_id,
-                user_id: stuff.user_id,
-                csrf_token: stuff.session_csrf_token,
-                expires: new_expires,
-            };
-            Ok(Some((session, user)))
-        } else {
-            Ok(None)
-        }
+        let user = User {
+            id: stuff.user_id,
+            username: stuff.user_username,
+            email: stuff.user_email,
+            created: stuff.user_created,
+        };
+        let session = Session {
+            id: stuff.session_id,
+            user_id: stuff.user_id,
+            csrf_token: stuff.session_csrf_token,
+            expires: new_expires,
+        };
+        Ok(Some((session, user)))
     }
 }
