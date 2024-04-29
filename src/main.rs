@@ -17,7 +17,7 @@ use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower_cookies::Key;
-use tracing::{error, info};
+use tracing::{error, info, info_span};
 use tracing_subscriber::{
     fmt::layer as fmt_layer, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     // Set up cancellation and task tracking
-    let canceler = CancellationToken::new();
+    let cancel_token = CancellationToken::new();
     let tracker = TaskTracker::new();
 
     // Set up the database connection pool
@@ -75,34 +75,37 @@ async fn main() -> anyhow::Result<()> {
     };
     let templates = load_templates()?;
     let inner = DSInner {
-        db,
+        db: db.clone(),
         config,
         templates,
         cookie_key: key,
         task_tracker: tracker.clone(),
-        cancel_token: canceler.clone(),
+        cancel_token: cancel_token.clone(),
     };
     let state: DogState = Arc::new(inner);
 
     // ok, ok,...
     let app = eardogger_app(state);
 
-    // Spawn the shutdown signal listener
-    tokio::spawn(cancel_on_terminate(canceler.clone()));
+    // Spawn the shutdown signal listener, outside the tracker
+    tokio::spawn(cancel_on_terminate(cancel_token.clone()));
+
+    // Spawn the stale session pruning worker, in the tracker
+    tracker.spawn(prune_stale_sessions_worker(db, cancel_token.clone()));
 
     // Serve the website til we're done!
     // TODO: get network stuff from config, do multi-modal serving
     info!("starting main server loop");
     let listener = TcpListener::bind("0.0.0.0:3000").await?;
     let serve_result = axum::serve(listener, app)
-        .with_graceful_shutdown(canceler.clone().cancelled_owned())
+        .with_graceful_shutdown(cancel_token.clone().cancelled_owned())
         .await;
 
     // Clean up:
     if let Err(e) = serve_result {
         // It's possible there was no cancel signal sent earlier, so send one now.
         error!("server loop exited with an error: {}", e);
-        canceler.cancel();
+        cancel_token.cancel();
     }
     info!("waiting for tasks to finish");
     tracker.close();
@@ -158,15 +161,16 @@ async fn db_pool(db_url: &str, max_connections: u32) -> Result<SqlitePool, sqlx:
 /// via either SIGINT (ctrl-c) or SIGTERM (kill), then cancels the provided
 /// CancellationToken. This can be spawned as an independent task, and then
 /// the main logic can just await the cancellation token.
-async fn cancel_on_terminate(canceler: CancellationToken) {
+async fn cancel_on_terminate(cancel_token: CancellationToken) {
+    let span = info_span!("cancel_on_terminate");
     use tokio::signal::{
         ctrl_c,
         unix::{signal, SignalKind},
     };
     let Ok(mut terminate) = signal(SignalKind::terminate()) else {
         // If we can't listen for the signal, bail immediately
-        error!("couldn't even establish SIGTERM signal listener; taking my ball and going home");
-        canceler.cancel();
+        error!(parent: &span, "couldn't even establish SIGTERM signal listener; taking my ball and going home");
+        cancel_token.cancel();
         return;
     };
     // Wait indefinitely until we hear a shutdown signal.
@@ -175,13 +179,56 @@ async fn cancel_on_terminate(canceler: CancellationToken) {
     select! {
         _ = ctrl_c() => {
             // don't care if Ok or Err
-            info!("received SIGINT, starting shutdown");
+            info!(parent: &span, "received SIGINT, starting shutdown");
         },
         _ = terminate.recv() => {
             // don't care if Some or None
-            info!("received SIGTERM, starting shutdown");
+            info!(parent: &span, "received SIGTERM, starting shutdown");
         },
     }
     // Ok, spread the news
-    canceler.cancel();
+    cancel_token.cancel();
+}
+
+/// Long-running job to purge expired login sessions from the database,
+/// so they don't keep accumulating indefinitely. This isn't
+/// important enough to block any other interesting work (the queries
+/// all exclude expired sessions, so they're already functionally
+/// gone), but you want to do it often enough that it's always fast.
+/// About the timing: if our process is owned by a web server, we're gonna
+/// need to serve requests immediately upon wakeup, and some of them may
+/// want the db writer. So we want to delay the first purge for several seconds.
+async fn prune_stale_sessions_worker(db: Db, cancel_token: CancellationToken) {
+    let span = info_span!("prune_stale_sessions_worker");
+    info!(parent: &span, "starting up session pruning worker; pausing before first purge");
+    let a_day = Duration::from_secs(60 * 60 * 24);
+    // Initial delay (or fast-track it on cancel)
+    select! {
+        _ = tokio::time::sleep(Duration::from_secs(10)) => {},
+        _ = cancel_token.cancelled() => {},
+    }
+    loop {
+        info!(parent: &span, "purging stale sessions...");
+        match db.sessions().delete_expired().await {
+            Ok(count) => {
+                info!(parent: &span, "purged {} sessions, going back to sleep", count);
+            }
+            Err(e) => {
+                error!(
+                    parent: &span,
+                    "db write error while purging sessions: {}; better luck next time",
+                    e
+                );
+            }
+        }
+        select! {
+            // We don't really need to do this more than once a day.
+            _ = tokio::time::sleep(a_day) => {}, // keep loopin'
+            _ = cancel_token.cancelled() => {
+                // don't keep loopin'
+                break;
+            }
+        }
+    }
+    info!(parent: &span, "shutting down session pruning worker");
 }
