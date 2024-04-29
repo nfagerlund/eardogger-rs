@@ -13,7 +13,11 @@ use std::{str::FromStr, sync::Arc};
 use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+use tokio::select;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tower_cookies::Key;
+use tracing::{error, info};
 use tracing_subscriber::{
     fmt::layer as fmt_layer, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
@@ -37,6 +41,11 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_tracy::TracyLayer::default())
         .with(fmt_layer())
         .init();
+
+    // Set up cancellation and task tracking
+    let canceler = CancellationToken::new();
+    let tracker = TaskTracker::new();
+
     // Set up the database connection pool
     // TODO: extract DB url into config
     let db_url = "sqlite:dev.db";
@@ -70,15 +79,35 @@ async fn main() -> anyhow::Result<()> {
         config,
         templates,
         cookie_key: key,
+        task_tracker: tracker.clone(),
+        cancel_token: canceler.clone(),
     };
     let state: DogState = Arc::new(inner);
 
     // ok, ok,...
     let app = eardogger_app(state);
 
+    // Spawn the shutdown signal listener
+    tokio::spawn(cancel_on_terminate(canceler.clone()));
+
+    // Serve the website til we're done!
     // TODO: get network stuff from config, do multi-modal serving
+    info!("starting main server loop");
     let listener = TcpListener::bind("0.0.0.0:3000").await?;
-    axum::serve(listener, app).await?;
+    let serve_result = axum::serve(listener, app)
+        .with_graceful_shutdown(canceler.clone().cancelled_owned())
+        .await;
+
+    // Clean up:
+    if let Err(e) = serve_result {
+        // It's possible there was no cancel signal sent earlier, so send one now.
+        error!("server loop exited with an error: {}", e);
+        canceler.cancel();
+    }
+    info!("waiting for tasks to finish");
+    tracker.close();
+    tracker.wait().await;
+    info!("see ya!");
 
     Ok(())
 }
@@ -87,12 +116,14 @@ async fn main() -> anyhow::Result<()> {
 /// to come from config somewhere, but I'm gonna hardcode it in cwd.
 async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
     if fs::try_exists(path).await? {
+        info!("loading existing cookie keyfile at {}", path);
         let mut f = File::open(path).await?;
         let mut keybuf = [0u8; 64];
         f.read_exact(&mut keybuf).await?;
         let key = Key::from(&keybuf);
         Ok(key)
     } else {
+        info!("generating new cookie keyfile at {}", path);
         let mut f = File::options()
             .write(true)
             .create_new(true)
@@ -121,4 +152,36 @@ async fn db_pool(db_url: &str, max_connections: u32) -> Result<SqlitePool, sqlx:
         // boss makes a dollar, db thread makes a dime, that's why I fish crab on company time
         .max_lifetime(Duration::from_secs(60 * 60 * 4));
     pool_opts.connect_with(db_opts).await
+}
+
+/// Waits until the program receives an external instruction to terminate
+/// via either SIGINT (ctrl-c) or SIGTERM (kill), then cancels the provided
+/// CancellationToken. This can be spawned as an independent task, and then
+/// the main logic can just await the cancellation token.
+async fn cancel_on_terminate(canceler: CancellationToken) {
+    use tokio::signal::{
+        ctrl_c,
+        unix::{signal, SignalKind},
+    };
+    let Ok(mut terminate) = signal(SignalKind::terminate()) else {
+        // If we can't listen for the signal, bail immediately
+        error!("couldn't even establish SIGTERM signal listener; taking my ball and going home");
+        canceler.cancel();
+        return;
+    };
+    // Wait indefinitely until we hear a shutdown signal.
+    // The ctrl_c function listens for SIGINT, the other one listens for SIGTERM
+    // (aka `kill`/`killall` with no flags).
+    select! {
+        _ = ctrl_c() => {
+            // don't care if Ok or Err
+            info!("received SIGINT, starting shutdown");
+        },
+        _ = terminate.recv() => {
+            // don't care if Some or None
+            info!("received SIGTERM, starting shutdown");
+        },
+    }
+    // Ok, spread the news
+    canceler.cancel();
 }
