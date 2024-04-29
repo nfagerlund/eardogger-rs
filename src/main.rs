@@ -115,8 +115,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Either load the cookie key from a binary file, or create one. IRL you'd want the file location
-/// to come from config somewhere, but I'm gonna hardcode it in cwd.
+/// Either load the cookie key from a binary file, or create one.
 async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
     if fs::try_exists(path).await? {
         info!("loading existing cookie keyfile at {}", path);
