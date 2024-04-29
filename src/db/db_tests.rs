@@ -106,7 +106,7 @@ async fn session_lifetime_modifier() {
         "#,
         sessid,
     )
-    .fetch_one(&db.pool)
+    .fetch_one(&db.read_pool)
     .await
     .unwrap()
     .expires;

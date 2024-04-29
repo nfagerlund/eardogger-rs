@@ -1,13 +1,13 @@
-use super::users::User;
+use super::{core::Db, users::User};
 use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta};
 use serde::Serialize;
-use sqlx::{query, query_as, SqlitePool};
+use sqlx::{query, query_as, query_scalar, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
 
 /// A query helper type for operating on [Token]s. Usually rented from a [Db].
 #[derive(Debug)]
 pub struct Tokens<'a> {
-    pool: &'a SqlitePool,
+    db: &'a Db,
 }
 
 /// Record struct for API authentication tokens associated with a [User].
@@ -85,8 +85,14 @@ impl From<TokenScope> for &'static str {
 
 // create, authenticate, destroy, list
 impl<'a> Tokens<'a> {
-    pub fn new(pool: &'a SqlitePool) -> Self {
-        Self { pool }
+    pub fn new(db: &'a Db) -> Self {
+        Self { db }
+    }
+    fn read_pool(&self) -> &SqlitePool {
+        &self.db.read_pool
+    }
+    fn write_pool(&self) -> &SqlitePool {
+        &self.db.write_pool
     }
 
     /// Create a token, and return it along with the *actual token cleartext.*
@@ -113,7 +119,7 @@ impl<'a> Tokens<'a> {
             scope_str,
             comment
         )
-        .fetch_one(self.pool)
+        .fetch_one(self.write_pool())
         .await?;
 
         Ok((token, token_cleartext))
@@ -141,7 +147,7 @@ impl<'a> Tokens<'a> {
             "#,
             token_hash
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await?;
 
         // Use query!() instead of query_as!(), because we want multiple records
@@ -163,7 +169,7 @@ impl<'a> Tokens<'a> {
             "#,
             token_hash
         )
-        .fetch_optional(self.pool)
+        .fetch_optional(self.read_pool())
         .await?;
 
         // Early out if we got nuthin
@@ -201,7 +207,7 @@ impl<'a> Tokens<'a> {
             id,
             user_id,
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await?;
         if res.rows_affected() == 1 {
             Ok(Some(()))
@@ -218,22 +224,26 @@ impl<'a> Tokens<'a> {
         page: u32,
         size: u32,
     ) -> anyhow::Result<(Vec<Token>, ListMeta)> {
+        // Do multiple reads in a transaction, so count and list see the
+        // same causal slice.
+        let mut tx = self.read_pool().begin().await?;
+
         // Get count first, as a separate query. For some reason sqlx tries
         // by default to return the value of COUNT() as an i32, which I
         // KNOW is not correct, so that column name with a colon overrides it
         // at the sqlx layer. I think.
-        let count = query!(
+        let count = query_scalar!(
             r#"
                 SELECT COUNT(id) AS 'count: u32' FROM tokens WHERE user_id = ?;
             "#,
             user_id,
         )
-        .fetch_one(self.pool)
-        .await?
-        .count;
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let meta = ListMeta { count, page, size };
 
         let offset = sqlite_offset(page, size)?;
-        let meta = ListMeta { count, page, size };
         let list = query_as!(
             Token,
             r#"
@@ -248,8 +258,10 @@ impl<'a> Tokens<'a> {
             size,
             offset,
         )
-        .fetch_all(self.pool)
+        .fetch_all(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         Ok((list, meta))
     }

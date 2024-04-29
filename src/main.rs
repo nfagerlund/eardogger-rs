@@ -44,7 +44,9 @@ async fn main() -> anyhow::Result<()> {
     // This is a low-traffic service running on shared hardware, so go easy on parallelism.
     // Up to (cores - 2) threads, with a minimum of 2.
     let max_readers = cores.saturating_sub(2).max(2);
-    let pool = db_pool(db_url, max_readers).await?;
+    let read_pool = db_pool(db_url, max_readers).await?;
+    let write_pool = db_pool(db_url, 1).await?;
+    let db = Db::new(read_pool, write_pool);
     // TODO: migrations?
 
     // Set up the cookie key
@@ -54,7 +56,6 @@ async fn main() -> anyhow::Result<()> {
 
     // Build the app state and config
     // TODO: extract all this into more convenient... stuffs...
-    let db = Db::new(pool);
     // TODO: get own_origin and assets_dir from config instead
     let own_url = Url::parse("http://localhost:3000")?;
     let assets_dir = "public".to_string();

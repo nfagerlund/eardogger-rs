@@ -1,3 +1,4 @@
+use super::core::Db;
 use crate::util::clean_optional_form_field;
 
 use anyhow::anyhow;
@@ -11,7 +12,7 @@ use time::OffsetDateTime;
 /// a [Db].
 #[derive(Debug)]
 pub struct Users<'a> {
-    pool: &'a SqlitePool,
+    db: &'a Db,
 }
 
 /// Record struct for user accounts.
@@ -72,8 +73,14 @@ fn valid_password(password: &str) -> anyhow::Result<&str> {
 
 // create, authenticate, set_password, change_password, set_email, destroy
 impl<'a> Users<'a> {
-    pub fn new(pool: &'a SqlitePool) -> Self {
-        Self { pool }
+    pub fn new(db: &'a Db) -> Self {
+        Self { db }
+    }
+    fn read_pool(&self) -> &SqlitePool {
+        &self.db.read_pool
+    }
+    fn write_pool(&self) -> &SqlitePool {
+        &self.db.write_pool
     }
 
     /// Create a new user account.
@@ -100,7 +107,7 @@ impl<'a> Users<'a> {
             password_hash,
             email,
         )
-        .fetch_one(self.pool)
+        .fetch_one(self.write_pool())
         .await
         .map_err(|e| e.into())
     }
@@ -121,7 +128,7 @@ impl<'a> Users<'a> {
             "#,
             username
         )
-        .fetch_optional(self.pool) // NICE!!!!
+        .fetch_optional(self.read_pool()) // NICE!!!!
         .await
         .map_err(|e| e.into())
     }
@@ -163,7 +170,7 @@ impl<'a> Users<'a> {
             password_hash,
             username,
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await?;
         if res.rows_affected() != 1 {
             Err(anyhow!("Couldn't find user with name {}.", username))
@@ -186,7 +193,7 @@ impl<'a> Users<'a> {
             email,
             username,
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await?;
         if res.rows_affected() != 1 {
             Err(anyhow!("Couldn't find user with name {}", username))
@@ -203,7 +210,7 @@ impl<'a> Users<'a> {
             "#,
             id,
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await?;
         if res.rows_affected() == 1 {
             Ok(Some(()))

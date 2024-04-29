@@ -1,16 +1,18 @@
+use super::core::Db;
 use crate::util::{
     clean_optional_form_field, matchable_from_url, normalize_prefix_matcher, sqlite_offset,
     ListMeta,
 };
+
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, SqlitePool};
+use sqlx::{query, query_as, query_scalar, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
 
 /// A query helper type for operating on [Dogears]. Usually rented from a [Db].
 #[derive(Debug)]
 pub struct Dogears<'a> {
-    pool: &'a SqlitePool,
+    db: &'a Db,
 }
 
 /// A record struct for user web serial bookmarks.
@@ -27,8 +29,14 @@ pub struct Dogear {
 
 // create, update, list, destroy, current_for_site
 impl<'a> Dogears<'a> {
-    pub fn new(pool: &'a SqlitePool) -> Self {
-        Self { pool }
+    pub fn new(db: &'a Db) -> Self {
+        Self { db }
+    }
+    fn read_pool(&self) -> &SqlitePool {
+        &self.db.read_pool
+    }
+    fn write_pool(&self) -> &SqlitePool {
+        &self.db.write_pool
     }
 
     /// Make a new dogear!
@@ -62,7 +70,7 @@ impl<'a> Dogears<'a> {
             current,
             normalized_display_name
         )
-        .fetch_one(self.pool)
+        .fetch_one(self.write_pool())
         .await
         .map_err(|e| e.into())
     }
@@ -91,7 +99,7 @@ impl<'a> Dogears<'a> {
             user_id,
             matchable,
         )
-        .fetch_all(self.pool)
+        .fetch_all(self.write_pool())
         .await?;
         if res.is_empty() {
             Ok(None)
@@ -123,7 +131,7 @@ impl<'a> Dogears<'a> {
             user_id,
             matchable,
         )
-        .fetch_optional(self.pool)
+        .fetch_optional(self.read_pool())
         .await?;
         Ok(res.map(|r| r.current))
     }
@@ -138,7 +146,7 @@ impl<'a> Dogears<'a> {
             id,
             user_id,
         )
-        .execute(self.pool)
+        .execute(self.write_pool())
         .await?;
         if res.rows_affected() == 1 {
             Ok(Some(()))
@@ -155,21 +163,25 @@ impl<'a> Dogears<'a> {
         page: u32,
         size: u32,
     ) -> anyhow::Result<(Vec<Dogear>, ListMeta)> {
+        // Do multiple reads in a transaction, so count and list see the
+        // same causal slice.
+        let mut tx = self.read_pool().begin().await?;
+
         // Count first, as a separate query. Note the sqlx "type coersion inside
         // the column name" thing, sigh.
-        let count = query!(
+        let count = query_scalar!(
             r#"
                 SELECT count(id) AS 'count: u32' FROM dogears
                 WHERE user_id = ?;
             "#,
             user_id,
         )
-        .fetch_one(self.pool)
-        .await?
-        .count;
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let meta = ListMeta { count, page, size };
 
         let offset = sqlite_offset(page, size)?;
-        let meta = ListMeta { count, page, size };
         let list = query_as!(
             Dogear,
             r#"
@@ -184,8 +196,10 @@ impl<'a> Dogears<'a> {
             size,
             offset,
         )
-        .fetch_all(self.pool)
+        .fetch_all(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         Ok((list, meta))
     }
