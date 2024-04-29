@@ -9,7 +9,7 @@
 //!
 //! Therefore, routes'll need to return a Result type, and the Error type
 //! will need to implement IntoResponse... AND, the Error type will ALSO
-//! need to implement From<T> for any intermediate error type I'll be
+//! need to implement `From<T>` for any intermediate error type I'll be
 //! invoking `?` on.
 //!
 //! Once I've got that, the next problem is that I can't use a template
@@ -18,7 +18,7 @@
 //! page skeleton and a `format!()` call.
 //!
 //! The concept here is adapted from this blog post:
-//! https://fasterthanli.me/series/updating-fasterthanli-me-for-2022/part-2
+//! <https://fasterthanli.me/series/updating-fasterthanli-me-for-2022/part-2>
 //! I don't need a bunch of the extra complexity from that, tho. He's
 //! using backtraces and stuff and is requiring a detour through the
 //! eyre::Report error type, so he can't just do a blanket impl for

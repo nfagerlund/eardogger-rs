@@ -133,7 +133,7 @@ impl<'a> Users<'a> {
         .map_err(|e| e.into())
     }
 
-    /// Just fetch a user. Most app logic should use [`authenticate`] instead,
+    /// Just fetch a user. Most app logic should use [`Users::authenticate`] instead,
     /// but this is nice to have in tests.
     pub async fn by_name(&self, username: &str) -> anyhow::Result<Option<User>> {
         Ok(self

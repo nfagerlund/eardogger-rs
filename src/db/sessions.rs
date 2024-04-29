@@ -30,7 +30,7 @@ pub struct Session {
     /// a mismatch would mean they submitted something *other* than a form we presented
     /// them on purpose. For the logged-out login form, we do this with a different
     /// scheme involving signed cookies. For more info, see:
-    /// https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+    /// <https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html>
     pub csrf_token: String,
     pub expires: OffsetDateTime,
 }
