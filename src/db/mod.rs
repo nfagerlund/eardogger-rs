@@ -24,7 +24,8 @@ pub use self::users::User;
 /// for readability.
 #[derive(Clone, Debug)]
 pub struct Db {
-    pool: SqlitePool,
+    read_pool: SqlitePool,
+    write_pool: SqlitePool,
 }
 
 /// A helper struct for setting up data in tests.
@@ -39,7 +40,12 @@ pub struct TestUser {
 impl Db {
     /// yeah.
     pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+        // TEMP, TODO: take write_pool in contructor args
+        let write_pool = pool.clone();
+        Self {
+            read_pool: pool,
+            write_pool,
+        }
     }
 
     // this is for tests, of course it's dead in real builds.
@@ -107,18 +113,18 @@ impl Db {
     }
 
     pub fn users(&self) -> Users {
-        Users::new(&self.pool)
+        Users::new(&self.read_pool)
     }
 
     pub fn tokens(&self) -> Tokens {
-        Tokens::new(&self.pool)
+        Tokens::new(&self.read_pool)
     }
 
     pub fn dogears(&self) -> Dogears {
-        Dogears::new(&self.pool)
+        Dogears::new(&self.read_pool)
     }
 
     pub fn sessions(&self) -> Sessions {
-        Sessions::new(&self.pool)
+        Sessions::new(&self.read_pool)
     }
 }
