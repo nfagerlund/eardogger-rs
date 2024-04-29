@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
     let max_readers = cores.saturating_sub(2).max(2);
     let read_pool = db_pool(db_url, max_readers).await?;
     let write_pool = db_pool(db_url, 1).await?;
-    let db = Db::new(read_pool, write_pool);
+    let db = Db::new(read_pool, write_pool, tracker.clone());
     // TODO: migrations?
 
     // Set up the cookie key
