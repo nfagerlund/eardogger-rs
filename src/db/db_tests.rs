@@ -9,7 +9,7 @@
 //! if you can get it to compile it's generally gonna work as expected.
 //! Still, porting the tests is a good way to verify that my port is accurate.
 
-use sqlx::{query, query_scalar};
+use sqlx::query_scalar;
 use time::{Duration, OffsetDateTime};
 
 use crate::util::ListMeta;
@@ -176,6 +176,20 @@ async fn token_create_auth_destroy() {
     // got right token and user back
     assert_eq!(auth_user.id, right_user.id);
     assert_eq!(auth_token.id, right_token.id);
+    // last_used got updated (asynchronously) upon auth
+    db.test_flush_tasks().await;
+    let last = query_scalar!(
+        r#"
+            SELECT last_used
+            FROM tokens
+            WHERE id = ?
+        "#,
+        right_token.id,
+    )
+    .fetch_one(&db.write_pool)
+    .await
+    .expect("db read err");
+    assert!(last.is_some());
     // DESTROY
     let wrong_destroy = tokens.destroy(right_token.id, wrong_user.id).await;
     // 404

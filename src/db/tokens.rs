@@ -3,6 +3,7 @@ use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta};
 use serde::Serialize;
 use sqlx::{query, query_as, query_scalar, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
+use tracing::error;
 
 /// A query helper type for operating on [Token]s. Usually rented from a [Db].
 #[derive(Debug)]
@@ -133,25 +134,12 @@ impl<'a> Tokens<'a> {
         token_cleartext: &str,
     ) -> anyhow::Result<Option<(Token, User)>> {
         let token_hash = sha256sum(token_cleartext);
+        let current_timestamp = OffsetDateTime::now_utc();
 
-        // First off, we do a fire-and-forget last-used bump. If this update
-        // whiffs, that's fine.
-        //
-        // (I wanted to do everything in one go, but I need the user too, and
-        // sqlite can't access an update's FROM clause in its RETURNING clause.)
-        query!(
-            r#"
-                UPDATE tokens
-                SET last_used = CURRENT_TIMESTAMP
-                WHERE token_hash = ?;
-            "#,
-            token_hash
-        )
-        .execute(self.write_pool())
-        .await?;
-
+        // First, grab the stuff.
         // Use query!() instead of query_as!(), because we want multiple records
         // and we don't have a struct for "user plus token fields".
+        let th = &token_hash; // temporary has to survive the macro
         let maybe = query!(
             r#"
                 SELECT
@@ -159,7 +147,6 @@ impl<'a> Tokens<'a> {
                     tokens.user_id   AS user_id,
                     tokens.scope     AS token_scope,
                     tokens.created   AS token_created,
-                    tokens.last_used AS token_last_used,
                     tokens.comment   AS token_comment,
                     users.username   AS user_username,
                     users.email      AS user_email,
@@ -167,21 +154,50 @@ impl<'a> Tokens<'a> {
                 FROM tokens JOIN users ON tokens.user_id = users.id
                 WHERE tokens.token_hash = ? LIMIT 1;
             "#,
-            token_hash
+            th
         )
         .fetch_optional(self.read_pool())
         .await?;
-
         // Early out if we got nuthin
         let Some(stuff) = maybe else {
             return Ok(None);
         };
+
+        // Then, do a fire-and-forget update on the last-used time. We don't need to see
+        // the result in our read, so we don't need to block our return on awaiting
+        // the single writer thread.
+        //
+        // This goes after the read so we can steal the token_hash string and avoid a clone.
+        let owned_write_pool = self.write_pool().clone();
+        self.db.task_tracker.spawn(async move {
+            let q_res = query!(
+                r#"
+                    UPDATE tokens
+                    SET last_used = CURRENT_TIMESTAMP
+                    WHERE token_hash = ?;
+                "#,
+                token_hash
+            )
+            .execute(&owned_write_pool)
+            .await;
+
+            if let Err(e) = q_res {
+                error!(
+                    name: "Tokens::authenticate last_used update",
+                    "DB write failed for async update of token last_used: {}",
+                    e,
+                );
+            }
+        });
+
+        // Finally, assemble the stuff. tokens.last_used is being updated async,
+        // so we use our pre-calculated value.
         let token = Token {
             id: stuff.token_id,
             user_id: stuff.user_id,
             scope: stuff.token_scope,
             created: stuff.token_created,
-            last_used: stuff.token_last_used,
+            last_used: Some(current_timestamp),
             comment: stuff.token_comment,
         };
         let user = User {
