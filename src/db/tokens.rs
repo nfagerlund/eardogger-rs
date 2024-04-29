@@ -224,6 +224,10 @@ impl<'a> Tokens<'a> {
         page: u32,
         size: u32,
     ) -> anyhow::Result<(Vec<Token>, ListMeta)> {
+        // Do multiple reads in a transaction, so count and list see the
+        // same causal slice.
+        let mut tx = self.read_pool().begin().await?;
+
         // Get count first, as a separate query. For some reason sqlx tries
         // by default to return the value of COUNT() as an i32, which I
         // KNOW is not correct, so that column name with a colon overrides it
@@ -234,7 +238,7 @@ impl<'a> Tokens<'a> {
             "#,
             user_id,
         )
-        .fetch_one(self.read_pool())
+        .fetch_one(&mut *tx)
         .await?;
 
         let meta = ListMeta { count, page, size };
@@ -254,8 +258,10 @@ impl<'a> Tokens<'a> {
             size,
             offset,
         )
-        .fetch_all(self.read_pool())
+        .fetch_all(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         Ok((list, meta))
     }

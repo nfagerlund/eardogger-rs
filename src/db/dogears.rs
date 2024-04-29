@@ -163,6 +163,10 @@ impl<'a> Dogears<'a> {
         page: u32,
         size: u32,
     ) -> anyhow::Result<(Vec<Dogear>, ListMeta)> {
+        // Do multiple reads in a transaction, so count and list see the
+        // same causal slice.
+        let mut tx = self.read_pool().begin().await?;
+
         // Count first, as a separate query. Note the sqlx "type coersion inside
         // the column name" thing, sigh.
         let count = query_scalar!(
@@ -172,7 +176,7 @@ impl<'a> Dogears<'a> {
             "#,
             user_id,
         )
-        .fetch_one(self.read_pool())
+        .fetch_one(&mut *tx)
         .await?;
 
         let meta = ListMeta { count, page, size };
@@ -192,8 +196,10 @@ impl<'a> Dogears<'a> {
             size,
             offset,
         )
-        .fetch_all(self.read_pool())
+        .fetch_all(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         Ok((list, meta))
     }
