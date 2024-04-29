@@ -2,7 +2,14 @@ use super::dogears::Dogears;
 use super::sessions::Sessions;
 use super::tokens::{TokenScope, Tokens};
 use super::users::Users;
-use sqlx::SqlitePool;
+use sqlx::Sqlite;
+use sqlx::{
+    pool::PoolOptions,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
+    SqlitePool,
+};
+use std::str::FromStr;
+use std::time::Duration;
 
 /// The app's main database helper type. One of these goes in the app state,
 /// and you can use it to access all the various resource methods, namespaced
@@ -15,11 +22,9 @@ pub struct Db {
 
 impl Db {
     /// yeah.
-    pub fn new(pool: SqlitePool) -> Self {
-        // TEMP, TODO: take write_pool in contructor args
-        let write_pool = pool.clone();
+    pub fn new(read_pool: SqlitePool, write_pool: SqlitePool) -> Self {
         Self {
-            read_pool: pool,
+            read_pool,
             write_pool,
         }
     }
@@ -46,12 +51,27 @@ impl Db {
     // this is for tests, of course it's dead in real builds.
     #[allow(dead_code)]
     pub async fn new_test_db() -> Self {
-        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        // Match the connect options from normal operation...
+        let db_opts = SqliteConnectOptions::from_str("sqlite::memory:").unwrap();
+        let db_opts = db_opts
+            .journal_mode(SqliteJournalMode::Wal)
+            .busy_timeout(Duration::from_secs(5))
+            .pragma("temp_store", "memory")
+            .optimize_on_close(true, 400)
+            .synchronous(SqliteSynchronous::Normal) // usually fine w/ wal
+            .foreign_keys(true);
+        // ...but cap the connections to 1 so we can just serialize everything.
+        let pool_opts: PoolOptions<Sqlite> = PoolOptions::new()
+            .max_connections(1) // default's 10, but we'll be explicit.
+            .min_connections(1);
+
+        let write_pool = pool_opts.connect_with(db_opts).await.unwrap();
         sqlx::migrate!("./migrations")
-            .run(&pool)
+            .run(&write_pool)
             .await
             .expect("sqlx-ploded during migrations");
-        Self::new(pool)
+        let read_pool = write_pool.clone();
+        Self::new(read_pool, write_pool)
     }
 
     /// Test helper. Create a new user with:
