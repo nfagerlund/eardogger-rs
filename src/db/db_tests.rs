@@ -9,7 +9,7 @@
 //! if you can get it to compile it's generally gonna work as expected.
 //! Still, porting the tests is a good way to verify that my port is accurate.
 
-use sqlx::query;
+use sqlx::{query, query_scalar};
 use time::{Duration, OffsetDateTime};
 
 use crate::util::ListMeta;
@@ -97,7 +97,7 @@ async fn session_lifetime_modifier() {
     // Now, check that authenticate does the expected thing. First, manually dink
     // w/ the db:
     let sessid = session.id.as_str();
-    let too_soon = query!(
+    let too_soon = query_scalar!(
         r#"
             UPDATE sessions
             SET expires = datetime('now', '+1 day')
@@ -106,12 +106,12 @@ async fn session_lifetime_modifier() {
         "#,
         sessid,
     )
-    .fetch_one(&db.read_pool)
+    .fetch_one(&db.write_pool)
     .await
-    .unwrap()
-    .expires;
+    .unwrap();
     // Session is now about to expire:
     assert!(too_soon - now < Duration::days(2));
+    // User performs some logged-in activity:
     let (new_session, _) = db
         .sessions()
         .authenticate(sessid)
@@ -119,9 +119,26 @@ async fn session_lifetime_modifier() {
         .expect("sess auth error")
         .expect("sess auth None");
     let new_delta = new_session.expires - now;
-    // expiry got reset:
+    // Returned session struct has an updated expiry:
     assert!(new_delta > Duration::days(89));
     assert!(new_delta < Duration::days(91));
+    // Double-check in the actual DB, after waiting for the async update to settle:
+    db.test_flush_tasks().await;
+    let new_stored_expires = query_scalar!(
+        r#"
+            SELECT expires
+            FROM sessions
+            WHERE id = ?;
+        "#,
+        sessid,
+    )
+    .fetch_one(&db.read_pool)
+    .await
+    .unwrap();
+    let new_stored_delta = new_stored_expires - now;
+    // expiry REALLY got reset:
+    assert!(new_stored_delta > Duration::days(89));
+    assert!(new_stored_delta < Duration::days(91));
 }
 
 #[tokio::test]
