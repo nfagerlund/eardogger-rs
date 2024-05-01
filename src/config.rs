@@ -10,3 +10,27 @@ pub struct DogConfig {
     /// The directory with static CSS/JS/image assets.
     pub assets_dir: String,
 }
+
+impl DogConfig {
+    // TODO: replace all this
+    pub fn temp_dev() -> anyhow::Result<Self> {
+        let own_url = Url::parse("http://localhost:3000")?;
+        let assets_dir = "public".to_string();
+        Ok(Self {
+            is_prod: false,
+            own_url,
+            assets_dir,
+        })
+    }
+
+    #[cfg(test)]
+    pub fn temp_test() -> anyhow::Result<Self> {
+        let own_url = Url::parse("http://eardogger.com")?;
+        let assets_dir = "public".to_string();
+        Ok(Self {
+            is_prod: false,
+            own_url,
+            assets_dir,
+        })
+    }
+}

@@ -66,15 +66,7 @@ async fn main() -> anyhow::Result<()> {
     let key = load_cookie_key(key_file).await?;
 
     // Build the app state and config
-    // TODO: extract all this into more convenient... stuffs...
-    // TODO: get own_origin and assets_dir from config instead
-    let own_url = Url::parse("http://localhost:3000")?;
-    let assets_dir = "public".to_string();
-    let config = DogConfig {
-        is_prod: false,
-        own_url,
-        assets_dir,
-    };
+    let config = DogConfig::temp_dev()?;
     let templates = load_templates()?;
     let inner = DSInner {
         db: db.clone(),
