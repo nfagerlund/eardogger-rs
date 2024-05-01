@@ -11,6 +11,7 @@ use url::Url;
 use super::state::*;
 use super::web_result::RawJsonError;
 use super::*;
+use crate::config::DogConfig;
 
 // Right, here's the ground rules for tests in this file. We're taking as
 // axiomatic that DB methods like Dogears::destroy work as advertised, bc

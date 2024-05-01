@@ -1,4 +1,5 @@
 mod app;
+mod config;
 mod db;
 mod util;
 
@@ -24,6 +25,7 @@ use tracing_subscriber::{
 use url::Url;
 
 use crate::app::{eardogger_app, load_templates, state::*};
+use crate::config::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
