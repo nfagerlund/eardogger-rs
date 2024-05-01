@@ -1,15 +1,8 @@
 use super::dogears::Dogears;
 use super::sessions::Sessions;
-use super::tokens::{TokenScope, Tokens};
+use super::tokens::Tokens;
 use super::users::Users;
-use sqlx::Sqlite;
-use sqlx::{
-    pool::PoolOptions,
-    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
-    SqlitePool,
-};
-use std::str::FromStr;
-use std::time::Duration;
+use sqlx::SqlitePool;
 use tokio_util::task::TaskTracker;
 
 /// The app's main database helper type. One of these goes in the app state,
@@ -54,6 +47,14 @@ impl Db {
 impl Db {
     #[cfg(test)]
     pub async fn new_test_db() -> Self {
+        use sqlx::Sqlite;
+        use sqlx::{
+            pool::PoolOptions,
+            sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
+        };
+        use std::str::FromStr;
+        use std::time::Duration;
+
         // Match the connect options from normal operation...
         let db_opts = SqliteConnectOptions::from_str("sqlite::memory:").unwrap();
         let db_opts = db_opts
@@ -96,6 +97,8 @@ impl Db {
     /// - Two bookmarks
     #[cfg(test)]
     pub async fn test_user(&self, name: &str) -> anyhow::Result<TestUser> {
+        use super::tokens::TokenScope;
+
         let (users, tokens, sessions, dogears) =
             (self.users(), self.tokens(), self.sessions(), self.dogears());
         let email = format!("{}@example.com", name);
