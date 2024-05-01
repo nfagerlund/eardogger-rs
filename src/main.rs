@@ -70,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
     let templates = load_templates()?;
     let inner = DSInner {
         db: db.clone(),
-        config,
+        config: config.clone(),
         templates,
         cookie_key: key,
         task_tracker: tracker.clone(),
@@ -93,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
     // Serve the website til we're done!
     // TODO: get network stuff from config, do multi-modal serving
     info!("starting main server loop");
-    let listener = TcpListener::bind("0.0.0.0:3000").await?;
+    let listener = TcpListener::bind(("0.0.0.0", config.port)).await?;
     let serve_result = axum::serve(listener, app)
         .with_graceful_shutdown(cancel_token.clone().cancelled_owned())
         .await;

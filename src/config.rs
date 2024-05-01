@@ -7,6 +7,8 @@ pub struct DogConfig {
     pub is_prod: bool,
     /// The site's own base URL.
     pub own_url: Url,
+    /// The port to listen on, if running our own http server.
+    pub port: u16,
     /// The directory with static CSS/JS/image assets.
     pub assets_dir: String,
 }
@@ -19,6 +21,7 @@ impl DogConfig {
         Ok(Self {
             is_prod: false,
             own_url,
+            port: 3000,
             assets_dir,
         })
     }
@@ -30,6 +33,7 @@ impl DogConfig {
         Ok(Self {
             is_prod: false,
             own_url,
+            port: 443,
             assets_dir,
         })
     }
