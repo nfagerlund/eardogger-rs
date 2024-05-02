@@ -438,11 +438,11 @@ pub async fn post_login(
     // just go to the home page.
     let mut redirect_to = state
         .config
-        .own_url
+        .public_url
         .join(&params.return_to)
-        .unwrap_or_else(|_| state.config.own_url.clone());
-    if redirect_to.origin() != state.config.own_url.origin() {
-        redirect_to = state.config.own_url.clone();
+        .unwrap_or_else(|_| state.config.public_url.clone());
+    if redirect_to.origin() != state.config.public_url.origin() {
+        redirect_to = state.config.public_url.clone();
     }
 
     // then, authenticate user and tack on a session cookie.
@@ -734,7 +734,7 @@ pub async fn api_update_cors_preflight(
 
     if let Some(origin) = req_headers.get(header::ORIGIN) {
         if let Ok(origin) = origin.to_str() {
-            if origin != state.config.own_url.origin().ascii_serialization() {
+            if origin != state.config.public_url.origin().ascii_serialization() {
                 // Then it's a CORS-eligible cross-origin request! Tack on them headers.
                 set_cors_headers_for_api_update(&mut res_headers, origin)?
             }
@@ -763,7 +763,7 @@ pub async fn api_update(
 
     if let Some(origin) = req_headers.get(header::ORIGIN) {
         if let Ok(origin) = origin.to_str() {
-            if origin != state.config.own_url.origin().ascii_serialization() {
+            if origin != state.config.public_url.origin().ascii_serialization() {
                 // Then it's a CORS-eligible cross-origin request!
 
                 // OK, first, CORS ACCESS CHECK.

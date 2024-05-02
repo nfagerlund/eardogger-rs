@@ -37,6 +37,9 @@ async fn main() -> anyhow::Result<()> {
     // .with(console_layer)
     // all this is onerous enough that I'm inclined to not leave it enabled.
 
+    // Get the config
+    let config = DogConfig::temp_dev()?;
+
     // Set up tracing
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
@@ -49,24 +52,19 @@ async fn main() -> anyhow::Result<()> {
     let tracker = TaskTracker::new();
 
     // Set up the database connection pool
-    // TODO: extract DB url into config
-    let db_url = "sqlite:dev.db";
     let cores = std::thread::available_parallelism()?.get() as u32;
     // This is a low-traffic service running on shared hardware, so go easy on parallelism.
     // Up to (cores - 2) threads, with a minimum of 2.
     let max_readers = cores.saturating_sub(2).max(2);
-    let read_pool = db_pool(db_url, max_readers).await?;
-    let write_pool = db_pool(db_url, 1).await?;
+    let read_pool = db_pool(&config.db_file, max_readers).await?;
+    let write_pool = db_pool(&config.db_file, 1).await?;
     let db = Db::new(read_pool, write_pool, tracker.clone());
     // TODO: migrations?
 
     // Set up the cookie key
-    // TODO: extract keyfile path into config
-    let key_file = "cookie_key.bin";
-    let key = load_cookie_key(key_file).await?;
+    let key = load_cookie_key(&config.key_file).await?;
 
-    // Build the app state and config
-    let config = DogConfig::temp_dev()?;
+    // Build the app state
     let templates = load_templates()?;
     let inner = DSInner {
         db: db.clone(),
@@ -91,7 +89,6 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Serve the website til we're done!
-    // TODO: get network stuff from config, do multi-modal serving
     info!("starting main server loop");
     let listener = TcpListener::bind(("0.0.0.0", config.port)).await?;
     let serve_result = axum::serve(listener, app)
@@ -138,9 +135,10 @@ async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
     }
 }
 
-async fn db_pool(db_url: &str, max_connections: u32) -> Result<SqlitePool, sqlx::Error> {
-    let db_opts = SqliteConnectOptions::from_str(db_url)?;
+async fn db_pool(db_file: &str, max_connections: u32) -> Result<SqlitePool, sqlx::Error> {
+    let db_opts = SqliteConnectOptions::new();
     let db_opts = db_opts
+        .filename(db_file)
         .journal_mode(SqliteJournalMode::Wal)
         .busy_timeout(Duration::from_secs(5))
         .pragma("temp_store", "memory")

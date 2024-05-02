@@ -39,7 +39,7 @@ impl DSInner {
         token: Option<&str>,
     ) -> Result<String, minijinja::Error> {
         let ctx = minijinja::context! {
-            own_origin => &self.config.own_url.origin().ascii_serialization(),
+            own_origin => &self.config.public_url.origin().ascii_serialization(),
             token => token,
         };
         Ok(make_bookmarklet(
