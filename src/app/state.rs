@@ -3,8 +3,8 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower_cookies::Key;
-use url::Url;
 
+use crate::config::DogConfig;
 use crate::db::Db;
 use crate::util::make_bookmarklet;
 
@@ -19,17 +19,6 @@ pub struct DSInner {
     pub cookie_key: Key,
     pub task_tracker: TaskTracker,
     pub cancel_token: CancellationToken,
-}
-
-/// Stuff that should be sourced from configuration, but for right now
-/// I'm just cramming it in wherever.
-#[derive(Clone, Debug)]
-pub struct DogConfig {
-    pub is_prod: bool,
-    /// The site's own base URL.
-    pub own_url: Url,
-    /// The directory with static CSS/JS/image assets.
-    pub assets_dir: String,
 }
 
 impl DSInner {
@@ -50,7 +39,7 @@ impl DSInner {
         token: Option<&str>,
     ) -> Result<String, minijinja::Error> {
         let ctx = minijinja::context! {
-            own_origin => &self.config.own_url.origin().ascii_serialization(),
+            own_origin => &self.config.public_url.origin().ascii_serialization(),
             token => token,
         };
         Ok(make_bookmarklet(

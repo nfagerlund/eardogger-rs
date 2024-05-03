@@ -1,0 +1,6 @@
+production = false
+public_url = "http://localhost:3000"
+port = 3000
+db_file = "dev.db"
+assets_dir = "public"
+key_file = "cookie_key.bin"

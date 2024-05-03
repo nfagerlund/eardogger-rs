@@ -1,4 +1,6 @@
 mod app;
+mod args;
+mod config;
 mod db;
 mod util;
 
@@ -8,8 +10,7 @@ use sqlx::{
     sqlite::{Sqlite, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
     SqlitePool,
 };
-use std::time::Duration;
-use std::{str::FromStr, sync::Arc};
+use std::{path::Path, sync::Arc, time::Duration};
 use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -21,9 +22,9 @@ use tracing::{error, info, info_span};
 use tracing_subscriber::{
     fmt::layer as fmt_layer, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
-use url::Url;
 
 use crate::app::{eardogger_app, load_templates, state::*};
+use crate::config::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -34,6 +35,12 @@ async fn main() -> anyhow::Result<()> {
     // let console_layer = console_subscriber::spawn(); // default values
     // .with(console_layer)
     // all this is onerous enough that I'm inclined to not leave it enabled.
+
+    // Get the config
+    let config = match args::config_path() {
+        Some(path) => DogConfig::load(path)?,
+        None => DogConfig::load("eardogger.toml")?,
+    };
 
     // Set up tracing
     tracing_subscriber::registry()
@@ -47,36 +54,23 @@ async fn main() -> anyhow::Result<()> {
     let tracker = TaskTracker::new();
 
     // Set up the database connection pool
-    // TODO: extract DB url into config
-    let db_url = "sqlite:dev.db";
     let cores = std::thread::available_parallelism()?.get() as u32;
     // This is a low-traffic service running on shared hardware, so go easy on parallelism.
     // Up to (cores - 2) threads, with a minimum of 2.
     let max_readers = cores.saturating_sub(2).max(2);
-    let read_pool = db_pool(db_url, max_readers).await?;
-    let write_pool = db_pool(db_url, 1).await?;
+    let read_pool = db_pool(&config.db_file, max_readers).await?;
+    let write_pool = db_pool(&config.db_file, 1).await?;
     let db = Db::new(read_pool, write_pool, tracker.clone());
     // TODO: migrations?
 
     // Set up the cookie key
-    // TODO: extract keyfile path into config
-    let key_file = "cookie_key.bin";
-    let key = load_cookie_key(key_file).await?;
+    let key = load_cookie_key(&config.key_file).await?;
 
-    // Build the app state and config
-    // TODO: extract all this into more convenient... stuffs...
-    // TODO: get own_origin and assets_dir from config instead
-    let own_url = Url::parse("http://localhost:3000")?;
-    let assets_dir = "public".to_string();
-    let config = DogConfig {
-        is_prod: false,
-        own_url,
-        assets_dir,
-    };
+    // Build the app state
     let templates = load_templates()?;
     let inner = DSInner {
         db: db.clone(),
-        config,
+        config: config.clone(),
         templates,
         cookie_key: key,
         task_tracker: tracker.clone(),
@@ -97,9 +91,8 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Serve the website til we're done!
-    // TODO: get network stuff from config, do multi-modal serving
     info!("starting main server loop");
-    let listener = TcpListener::bind("0.0.0.0:3000").await?;
+    let listener = TcpListener::bind(("0.0.0.0", config.port)).await?;
     let serve_result = axum::serve(listener, app)
         .with_graceful_shutdown(cancel_token.clone().cancelled_owned())
         .await;
@@ -121,16 +114,17 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// Either load the cookie key from a binary file, or create one.
-async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
+async fn load_cookie_key(path: impl AsRef<Path>) -> tokio::io::Result<Key> {
+    let path = path.as_ref();
     if fs::try_exists(path).await? {
-        info!("loading existing cookie keyfile at {}", path);
+        info!("loading existing cookie keyfile at {:?}", path);
         let mut f = File::open(path).await?;
         let mut keybuf = [0u8; 64];
         f.read_exact(&mut keybuf).await?;
         let key = Key::from(&keybuf);
         Ok(key)
     } else {
-        info!("generating new cookie keyfile at {}", path);
+        info!("generating new cookie keyfile at {:?}", path);
         let mut f = File::options()
             .write(true)
             .create_new(true)
@@ -144,9 +138,13 @@ async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
     }
 }
 
-async fn db_pool(db_url: &str, max_connections: u32) -> Result<SqlitePool, sqlx::Error> {
-    let db_opts = SqliteConnectOptions::from_str(db_url)?;
+async fn db_pool(
+    db_file: impl AsRef<Path>,
+    max_connections: u32,
+) -> Result<SqlitePool, sqlx::Error> {
+    let db_opts = SqliteConnectOptions::new();
     let db_opts = db_opts
+        .filename(db_file)
         .journal_mode(SqliteJournalMode::Wal)
         .busy_timeout(Duration::from_secs(5))
         .pragma("temp_store", "memory")

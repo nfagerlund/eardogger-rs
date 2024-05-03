@@ -39,11 +39,14 @@ fn unwrap_or(v: Value, other: Option<Value>) -> Value {
 }
 
 // Right, so here's my theory of template data (today, for now). Making a
-// struct for every page would be kind of silly and a pain, so I do in fact
-// want the flexibility of that context!{k=>} macro. However, I also want type
-// guardrails wherever it makes sense to get them. SO, I'm gonna make structs
-// for each "major chunk of page stuff" basically, and then assemble those into
-// a context so that each context has maybe two or three things in it tops.
+// _wholly_ unique struct for every page would be kind of silly and a pain, so I
+// want the flexibility of that context!{k=>v} macro. However, I also want type
+// guardrails where practical. SO, I'm gonna make structs for each "major chunk
+// of page stuff" basically, and then assemble those into a context with maybe
+// two or three things in it.
+// Some of these "major chunks" have only one item in them, which is still
+// mildly silly, but I'm banking on getting some benefit later from keeping loose
+// primitives out of the context macros.
 
 /// Template data that pretty much every page is gonna need. The main layout
 /// is free to use anything in here, as are any nested pages. Haven't decided
@@ -108,14 +111,10 @@ pub struct LoginPage<'a> {
     pub previously_failed: bool,
 }
 
-// This one's kind of silly, but my theory is that I'll benefit if everything
-// *inside* the freeform context has a known type.
 #[derive(Serialize)]
 pub struct ErrorPage<'a> {
     pub error: &'a str,
 }
-
-// TODO still: bookmarklets.
 
 // For now, I'm just gonna load all the templates statically and compile em
 // in to the app.
@@ -193,7 +192,7 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
     // "none". This is apparently intentional, but I extremely don't want it.
     // Luckily, the formatter provides a clean way to patch that for the whole
     // runtime, instead of having to do per-type serialize shenanigans. We want
-    // the default escape_formatter for file-extension mediated HTML escaping,
+    // the default escape_formatter for file-extension mediated HTML or JS escaping,
     // but we'll wrap it with a lil closure to fix Nones. Note that this ONLY
     // affects printing; values are preserved in a typed format when passing
     // through filters or functions.

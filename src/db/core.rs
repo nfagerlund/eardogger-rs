@@ -1,15 +1,8 @@
 use super::dogears::Dogears;
 use super::sessions::Sessions;
-use super::tokens::{TokenScope, Tokens};
+use super::tokens::Tokens;
 use super::users::Users;
-use sqlx::Sqlite;
-use sqlx::{
-    pool::PoolOptions,
-    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
-    SqlitePool,
-};
-use std::str::FromStr;
-use std::time::Duration;
+use sqlx::SqlitePool;
 use tokio_util::task::TaskTracker;
 
 /// The app's main database helper type. One of these goes in the app state,
@@ -52,9 +45,16 @@ impl Db {
 
 // Test stuff, kept a lil separate from the main stuff.
 impl Db {
-    // this is for tests, of course it's dead in real builds.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub async fn new_test_db() -> Self {
+        use sqlx::Sqlite;
+        use sqlx::{
+            pool::PoolOptions,
+            sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
+        };
+        use std::str::FromStr;
+        use std::time::Duration;
+
         // Match the connect options from normal operation...
         let db_opts = SqliteConnectOptions::from_str("sqlite::memory:").unwrap();
         let db_opts = db_opts
@@ -82,7 +82,7 @@ impl Db {
     /// related conditions. This shouldn't ever be used in real operation,
     /// because the task tracker will contain tasks that won't end until
     /// shutdown time, but it's potentially useful in tests.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub async fn test_flush_tasks(&self) {
         self.task_tracker.close();
         self.task_tracker.wait().await;
@@ -95,8 +95,10 @@ impl Db {
     /// - A write token and a manage token
     /// - An active login session
     /// - Two bookmarks
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub async fn test_user(&self, name: &str) -> anyhow::Result<TestUser> {
+        use super::tokens::TokenScope;
+
         let (users, tokens, sessions, dogears) =
             (self.users(), self.tokens(), self.sessions(), self.dogears());
         let email = format!("{}@example.com", name);
@@ -144,7 +146,7 @@ impl Db {
 }
 
 /// A helper struct for setting up data in tests.
-#[allow(dead_code)]
+#[cfg(test)]
 pub struct TestUser {
     pub name: String,
     pub write_token: String,

@@ -2,3 +2,4 @@
 .env
 *.db*
 cookie_key.bin
+eardogger.toml

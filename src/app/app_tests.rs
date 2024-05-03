@@ -6,11 +6,11 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower::{Service, ServiceExt}; // for `call`, `oneshot`, and `ready`
-use url::Url;
 
 use super::state::*;
 use super::web_result::RawJsonError;
 use super::*;
+use crate::config::DogConfig;
 
 // Right, here's the ground rules for tests in this file. We're taking as
 // axiomatic that DB methods like Dogears::destroy work as advertised, bc
@@ -20,13 +20,7 @@ use super::*;
 
 async fn test_state() -> DogState {
     let db = crate::db::Db::new_test_db().await;
-    let own_url = Url::parse("http://eardogger.com").unwrap();
-    let assets_dir = "public".to_string();
-    let config = DogConfig {
-        is_prod: false,
-        own_url,
-        assets_dir,
-    };
+    let config = DogConfig::temp_test().unwrap();
     let templates = load_templates().unwrap();
     let inner = DSInner {
         db,
