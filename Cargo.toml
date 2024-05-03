@@ -19,7 +19,7 @@ regex = "1.10.3"
 lazy_static = "1.4.0"
 
 # Database:
-sqlx = { version = "0.7.3", features = [
+sqlx = { version = "0.7.4", features = [
     "sqlite",
     "runtime-tokio",
     "tls-rustls",
