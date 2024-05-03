@@ -1,4 +1,5 @@
 mod app;
+mod args;
 mod config;
 mod db;
 mod util;
@@ -36,7 +37,10 @@ async fn main() -> anyhow::Result<()> {
     // all this is onerous enough that I'm inclined to not leave it enabled.
 
     // Get the config
-    let config = DogConfig::temp_dev()?;
+    let config = match args::config_path() {
+        Some(path) => DogConfig::load(path)?,
+        None => DogConfig::load("eardogger.toml")?,
+    };
 
     // Set up tracing
     tracing_subscriber::registry()
@@ -110,7 +114,8 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// Either load the cookie key from a binary file, or create one.
-async fn load_cookie_key(path: &Path) -> tokio::io::Result<Key> {
+async fn load_cookie_key(path: impl AsRef<Path>) -> tokio::io::Result<Key> {
+    let path = path.as_ref();
     if fs::try_exists(path).await? {
         info!("loading existing cookie keyfile at {:?}", path);
         let mut f = File::open(path).await?;
@@ -133,7 +138,10 @@ async fn load_cookie_key(path: &Path) -> tokio::io::Result<Key> {
     }
 }
 
-async fn db_pool(db_file: &Path, max_connections: u32) -> Result<SqlitePool, sqlx::Error> {
+async fn db_pool(
+    db_file: impl AsRef<Path>,
+    max_connections: u32,
+) -> Result<SqlitePool, sqlx::Error> {
     let db_opts = SqliteConnectOptions::new();
     let db_opts = db_opts
         .filename(db_file)

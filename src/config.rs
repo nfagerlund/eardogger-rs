@@ -1,6 +1,14 @@
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
 use url::Url;
+
+#[derive(Error, Debug)]
+pub enum ConfError {
+    // The generated code for returning an error is cheaper than maybe panicking.
+    #[error("a prior check guaranteed that this error would never happen.")]
+    Impossible,
+}
 
 /// Stuff the app needs that's sourced from configuration.
 #[derive(Clone, Debug)]
@@ -58,12 +66,17 @@ impl PreDogConfig {
 }
 
 impl DogConfig {
-    // TODO: replace all this
-    pub fn temp_dev() -> anyhow::Result<Self> {
-        let loaded = std::fs::read_to_string("eardogger.toml")?;
-        let pre: PreDogConfig = toml::from_str(&loaded)?;
+    /// Load app configuration from a config file. The provided path can be absolute
+    /// or relative to the current working directory.
+    pub fn load(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let cwd = std::env::current_dir()?;
-        pre.finalize(&cwd)
+        let abs_path = cwd.join(path.as_ref());
+        // This runs before we have a tracing subscriber, so we have to log rudely.
+        println!("Startup: loading config file from {:?}", &abs_path);
+        let base_dir = abs_path.parent().ok_or(ConfError::Impossible)?;
+        let conf_text = std::fs::read_to_string(&abs_path)?;
+        let pre: PreDogConfig = toml::from_str(&conf_text)?;
+        pre.finalize(base_dir)
     }
 
     #[cfg(test)]
