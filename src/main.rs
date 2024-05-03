@@ -110,16 +110,16 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// Either load the cookie key from a binary file, or create one.
-async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
+async fn load_cookie_key(path: &Path) -> tokio::io::Result<Key> {
     if fs::try_exists(path).await? {
-        info!("loading existing cookie keyfile at {}", path);
+        info!("loading existing cookie keyfile at {:?}", path);
         let mut f = File::open(path).await?;
         let mut keybuf = [0u8; 64];
         f.read_exact(&mut keybuf).await?;
         let key = Key::from(&keybuf);
         Ok(key)
     } else {
-        info!("generating new cookie keyfile at {}", path);
+        info!("generating new cookie keyfile at {:?}", path);
         let mut f = File::options()
             .write(true)
             .create_new(true)
@@ -133,7 +133,7 @@ async fn load_cookie_key(path: &str) -> tokio::io::Result<Key> {
     }
 }
 
-async fn db_pool(db_file: &str, max_connections: u32) -> Result<SqlitePool, sqlx::Error> {
+async fn db_pool(db_file: &Path, max_connections: u32) -> Result<SqlitePool, sqlx::Error> {
     let db_opts = SqliteConnectOptions::new();
     let db_opts = db_opts
         .filename(db_file)
