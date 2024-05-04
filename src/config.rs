@@ -114,3 +114,10 @@ impl DogConfig {
         pre.finalize(&cwd)
     }
 }
+
+#[cfg(test)]
+#[test]
+fn valid_example_config_file() {
+    DogConfig::load("eardogger.example.toml")
+        .expect("example config file is valid and up-to-date with impl");
+}

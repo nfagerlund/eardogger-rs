@@ -1,6 +1,13 @@
 production = false
+validate_migrations = true
 public_url = "http://localhost:3000"
-port = 3000
 db_file = "dev.db"
 assets_dir = "public"
 key_file = "cookie_key.bin"
+
+[mode.http]
+port = 3000
+
+# or, alternately:
+# [mode.fcgi]
+# max_connections = 50
