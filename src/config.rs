@@ -16,6 +16,9 @@ pub struct DogConfig {
     /// Whether we're running in production or not. Currently not really consulted
     /// for anything.
     pub production: bool,
+    /// Whether to check the integrity of database migrations before continuing
+    /// startup.
+    pub validate_migrations: bool,
     /// The site's own public-facing base URL.
     pub public_url: Url,
     /// The port to listen on, if running our own http server.
@@ -34,6 +37,7 @@ pub struct DogConfig {
 #[derive(Debug, Deserialize)]
 struct PreDogConfig {
     production: bool,
+    validate_migrations: bool,
     public_url: String,
     port: u16,
     // These three file paths can be absolute, or relative to the config file's dir.
@@ -52,10 +56,14 @@ impl PreDogConfig {
         let key_file = base_dir.join(&self.key_file);
         // Chomp the rest
         let Self {
-            production, port, ..
+            production,
+            validate_migrations,
+            port,
+            ..
         } = self;
         Ok(DogConfig {
             production,
+            validate_migrations,
             public_url,
             port,
             db_file,
@@ -83,6 +91,7 @@ impl DogConfig {
     pub fn temp_test() -> anyhow::Result<Self> {
         let pre = PreDogConfig {
             production: false,
+            validate_migrations: false,
             public_url: "http://eardogger.com".to_string(),
             port: 443,
             // tests build their own in-memory db pools anyway.

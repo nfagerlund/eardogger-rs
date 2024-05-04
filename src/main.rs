@@ -61,7 +61,10 @@ async fn main() -> anyhow::Result<()> {
     let read_pool = db_pool(&config.db_file, max_readers).await?;
     let write_pool = db_pool(&config.db_file, 1).await?;
     let db = Db::new(read_pool, write_pool, tracker.clone());
-    // TODO: migrations?
+    // Maybe check the migrations.
+    if config.validate_migrations {
+        db.validate_migrations().await?;
+    }
 
     // Set up the cookie key
     let key = load_cookie_key(&config.key_file).await?;
