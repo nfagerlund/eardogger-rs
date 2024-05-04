@@ -18,7 +18,7 @@ use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower_cookies::Key;
-use tracing::{error, info, info_span};
+use tracing::{debug, error, info, info_span};
 use tracing_subscriber::{
     fmt::layer as fmt_layer, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
@@ -57,6 +57,7 @@ async fn main() -> anyhow::Result<()> {
     let tracker = TaskTracker::new();
 
     // Set up the database connection pool
+    debug!("using db file at {:?}", &config.db_file);
     let cores = std::thread::available_parallelism()?.get() as u32;
     // This is a low-traffic service running on shared hardware, so go easy on parallelism.
     // Up to (cores - 2) threads, with a minimum of 2.
