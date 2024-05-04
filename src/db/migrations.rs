@@ -1,9 +1,9 @@
 use super::core::Db;
 use sqlx::{
     migrate::{Migrate, Migrator},
-    SqlitePool,
+    query_scalar, SqlitePool,
 };
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 use thiserror::Error;
 use tracing::{debug, info};
 
@@ -29,6 +29,28 @@ impl MigrationError {
     pub fn any(&self) -> bool {
         self.wrong_checksum + self.unapplied > 0
     }
+}
+
+#[derive(Debug)]
+pub enum Status {
+    Applied {
+        version: i64,
+        description: Cow<'static, str>,
+    },
+    Busted {
+        version: i64,
+        description: Cow<'static, str>,
+        applied_checksum: Cow<'static, [u8]>,
+        intended_checksum: Cow<'static, [u8]>,
+    },
+    Pending {
+        version: i64,
+        description: Cow<'static, str>,
+    },
+    Unrecognized {
+        version: i64,
+        description: String,
+    },
 }
 
 impl<'a> Migrations<'a> {
@@ -93,5 +115,63 @@ impl<'a> Migrations<'a> {
         } else {
             Ok(())
         }
+    }
+
+    /// Basically a wordier version of .validate(), meant for printing info to the terminal.
+    pub async fn info(&self) -> anyhow::Result<Vec<Status>> {
+        let mut conn = self.read_pool().acquire().await?;
+        let mut applied_migrations: HashMap<_, _> = conn
+            .list_applied_migrations()
+            .await?
+            .into_iter()
+            .map(|m| (m.version, m.checksum))
+            .collect();
+
+        // This pass catches all the known migrations, then we handle unknowns afterwards.
+        let mut statuses: Vec<Status> = MIGRATOR
+            .iter()
+            .filter(|&m| !m.migration_type.is_down_migration())
+            .map(|known| match applied_migrations.remove(&known.version) {
+                Some(checksum) => {
+                    if checksum == known.checksum {
+                        Status::Applied {
+                            version: known.version,
+                            description: known.description.clone(),
+                        }
+                    } else {
+                        Status::Busted {
+                            version: known.version,
+                            description: known.description.clone(),
+                            applied_checksum: checksum,
+                            intended_checksum: known.checksum.clone(),
+                        }
+                    }
+                }
+                None => Status::Pending {
+                    version: known.version,
+                    description: known.description.clone(),
+                },
+            })
+            .collect();
+
+        // OK, anything left is unknown.
+        if !applied_migrations.is_empty() {
+            let mut unknowns: Vec<i64> = applied_migrations.keys().cloned().collect();
+            unknowns.sort();
+            for version in unknowns.into_iter() {
+                let description = query_scalar!(
+                    r#"SELECT description FROM _sqlx_migrations WHERE version = ?;"#,
+                    version
+                )
+                .fetch_one(self.read_pool())
+                .await?;
+                statuses.push(Status::Unrecognized {
+                    version,
+                    description,
+                });
+            }
+        }
+
+        Ok(statuses)
     }
 }
