@@ -94,9 +94,6 @@ impl<'a> Migrations<'a> {
         Self { db }
     }
 
-    fn read_pool(&self) -> &SqlitePool {
-        &self.db.read_pool
-    }
     fn write_pool(&self) -> &SqlitePool {
         &self.db.write_pool
     }
@@ -111,7 +108,10 @@ impl<'a> Migrations<'a> {
     /// https://github.com/launchbadge/sqlx/blob/5d6c33ed65cc2/sqlx-cli/src/migrate.rs
     /// We're doing a fast and dirty version of the same thing.
     pub async fn validate(&self) -> anyhow::Result<()> {
-        let mut conn = self.read_pool().acquire().await?;
+        // Using write pool bc there's a small chance of CREATE TABLE.
+        // Also this happens before normal operation so we aren't worried about contention.
+        let mut conn = self.write_pool().acquire().await?;
+        conn.ensure_migrations_table().await?;
         let mut applied_migrations: HashMap<_, _> = conn
             .list_applied_migrations()
             .await?
@@ -155,7 +155,10 @@ impl<'a> Migrations<'a> {
 
     /// Basically a wordier version of .validate(), meant for printing info to the terminal.
     pub async fn info(&self) -> anyhow::Result<Vec<Status>> {
-        let mut conn = self.read_pool().acquire().await?;
+        // Using write pool bc there's a small chance of CREATE TABLE.
+        // Also this happens before normal operation so we aren't worried about contention.
+        let mut conn = self.write_pool().acquire().await?;
+        conn.ensure_migrations_table().await?;
         let mut applied_migrations: HashMap<_, _> = conn
             .list_applied_migrations()
             .await?
@@ -199,7 +202,7 @@ impl<'a> Migrations<'a> {
                     r#"SELECT description FROM _sqlx_migrations WHERE version = ?;"#,
                     version
                 )
-                .fetch_one(self.read_pool())
+                .fetch_one(&mut *conn)
                 .await?;
                 statuses.push(Status::Unrecognized {
                     version,
