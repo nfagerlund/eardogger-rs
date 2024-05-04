@@ -51,7 +51,7 @@ impl<'a> Migrations<'a> {
     /// Check whether the database migrations are in a usable state. For background
     /// on the logic in here, consult the source of the sqlx CLI:
     /// https://github.com/launchbadge/sqlx/blob/5d6c33ed65cc2/sqlx-cli/src/migrate.rs
-    /// We're doing basically the same thing.
+    /// We're doing a fast and dirty version of the same thing.
     pub async fn validate(&self) -> anyhow::Result<()> {
         let mut conn = self.read_pool().acquire().await?;
         let mut applied_migrations: HashMap<_, _> = conn
@@ -70,15 +70,14 @@ impl<'a> Migrations<'a> {
             .filter(|&m| !m.migration_type.is_down_migration())
         {
             total_known += 1;
-            match applied_migrations.get(&known.version) {
+            match applied_migrations.remove(&known.version) {
                 Some(checksum) => {
-                    if *checksum != known.checksum {
+                    if checksum != known.checksum {
                         errs.wrong_checksum += 1;
                     }
                 }
                 None => errs.unapplied += 1,
             }
-            applied_migrations.remove(&known.version);
         }
         unrecognized += applied_migrations.len();
         debug!("{} known migrations", total_known);
