@@ -70,6 +70,7 @@ async fn main() -> anyhow::Result<()> {
     if options.migrate {
         info!("--migrate: running database migrations now.");
         db.migrations().run().await?;
+        db.close().await;
         info!("--migrate: finished migrations. see u, space cowboy.");
         return Ok(());
     }
@@ -123,8 +124,7 @@ async fn main() -> anyhow::Result<()> {
     info!("waiting for tasks to finish");
     tracker.close();
     tracker.wait().await;
-    db.read_pool.close().await;
-    db.write_pool.close().await;
+    db.close().await;
     info!("see ya!");
 
     Ok(())

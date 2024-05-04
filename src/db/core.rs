@@ -27,6 +27,11 @@ impl Db {
         }
     }
 
+    /// Close all database connections in preparation for shutdown.
+    pub async fn close(&self) {
+        tokio::join!(self.write_pool.close(), self.read_pool.close());
+    }
+
     pub fn users(&self) -> Users {
         Users::new(self)
     }
