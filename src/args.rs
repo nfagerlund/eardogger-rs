@@ -5,11 +5,15 @@ use std::path::PathBuf;
 // oh, lol, I already have clap in my cargo.toml. well.... anyway.
 
 pub struct Options {
-    /// The --config option lets you specify the path of the config file
-    /// to use. It's optional; if omitted, we'll use eardogger.toml in the current
+    /// --config lets you specify the path of the config file to use.
+    /// It's optional; if omitted, we'll use eardogger.toml in the current
     /// working directory.
     pub config: Option<PathBuf>,
+    /// --migrate runs any pending database migrations, and then exits instead
+    /// of starting the server.
     pub migrate: bool,
+    /// --status prints the current database migrations status and then exits.
+    pub status: bool,
 }
 
 enum ParserState {
@@ -20,6 +24,7 @@ enum ParserState {
 pub fn cli_options() -> Options {
     let mut config = None;
     let mut migrate = false;
+    let mut status = false;
 
     let mut state = ParserState::Scanning;
     for arg in std::env::args() {
@@ -32,6 +37,8 @@ pub fn cli_options() -> Options {
                     migrate = true;
                 } else if arg == "--config" {
                     state = ParserState::ConfigVal;
+                } else if arg == "--status" {
+                    status = true;
                 }
                 // otherwise ignore.
             }
@@ -50,5 +57,9 @@ pub fn cli_options() -> Options {
         }
     }
 
-    Options { config, migrate }
+    Options {
+        config,
+        migrate,
+        status,
+    }
 }
