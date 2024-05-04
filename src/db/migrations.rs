@@ -3,7 +3,7 @@ use sqlx::{
     migrate::{Migrate, Migrator},
     query_scalar, SqlitePool,
 };
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 use thiserror::Error;
 use tracing::{debug, info};
 
@@ -51,6 +51,42 @@ pub enum Status {
         version: i64,
         description: String,
     },
+}
+
+impl Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Status::Applied {
+                version: v,
+                description: d,
+            } => {
+                write!(f, "{v} (applied)    {d}")
+            }
+            Status::Busted {
+                version: v,
+                description: d,
+                applied_checksum: have,
+                intended_checksum: want,
+            } => {
+                write!(
+                    f,
+                    "{v} (!!BUSTED!!) {d} - have {have:02x?}, want {want:02x?}"
+                )
+            }
+            Status::Pending {
+                version: v,
+                description: d,
+            } => {
+                write!(f, "{v} (pending)    {d}")
+            }
+            Status::Unrecognized {
+                version: v,
+                description: d,
+            } => {
+                write!(f, "{v} (!!FUTURE!!) {d}")
+            }
+        }
+    }
 }
 
 impl<'a> Migrations<'a> {
