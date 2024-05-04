@@ -433,3 +433,10 @@ async fn dogears() {
     let (list, _) = dogears.list(user.id, 1, 50).await.expect("no err");
     assert_eq!(list.len(), 2);
 }
+
+#[tokio::test]
+async fn migrations_test() {
+    let db = Db::new_test_db().await;
+    // By definition, this just had the migrations run on it. So:
+    db.validate_migrations().await.expect("migrations valid");
+}

@@ -1,9 +1,13 @@
+use std::collections::HashMap;
+
 use super::dogears::Dogears;
 use super::sessions::Sessions;
 use super::tokens::Tokens;
 use super::users::Users;
-use sqlx::SqlitePool;
+use sqlx::{migrate::Migrate, SqlitePool};
+use thiserror::Error;
 use tokio_util::task::TaskTracker;
+use tracing::debug;
 
 /// The app's main database helper type. One of these goes in the app state,
 /// and you can use it to access all the various resource methods, namespaced
@@ -40,6 +44,62 @@ impl Db {
 
     pub fn sessions(&self) -> Sessions {
         Sessions::new(self)
+    }
+
+    pub async fn run_migrations(&self) -> Result<(), sqlx::migrate::MigrateError> {
+        sqlx::migrate!("./migrations").run(&self.write_pool).await
+    }
+
+    pub async fn validate_migrations(&self) -> anyhow::Result<()> {
+        let migrator = sqlx::migrate!("./migrations");
+        let mut conn = self.read_pool.acquire().await?;
+        let mut applied_migrations: HashMap<_, _> = conn
+            .list_applied_migrations()
+            .await?
+            .into_iter()
+            .map(|m| (m.version, m.checksum))
+            .collect();
+
+        let mut errs = MigrationError::default();
+        let mut total = 0usize;
+
+        for known in migrator
+            .iter()
+            .filter(|&m| !m.migration_type.is_down_migration())
+        {
+            total += 1;
+            match applied_migrations.get(&known.version) {
+                Some(checksum) => {
+                    if *checksum != known.checksum {
+                        errs.wrong_checksum += 1;
+                    }
+                }
+                None => errs.unapplied += 1,
+            }
+            applied_migrations.remove(&known.version);
+        }
+        errs.unrecognized += applied_migrations.len();
+        debug!("{} total migrations", total);
+
+        if errs.any() {
+            Err(errs.into())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[derive(Error, Default, Debug)]
+#[error("bad migration situation: {unapplied} unapplied, {wrong_checksum} busted, {unrecognized} unrecognized.")]
+pub struct MigrationError {
+    wrong_checksum: usize,
+    unrecognized: usize,
+    unapplied: usize,
+}
+
+impl MigrationError {
+    pub fn any(&self) -> bool {
+        self.wrong_checksum + self.unapplied + self.unrecognized > 0
     }
 }
 
