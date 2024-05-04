@@ -14,3 +14,17 @@ Don't worry about it. ☺️
 ## I Heard U Dinked With Some Edge-Case Semantics in the V1 API Without Bumping the Version???
 
 Hush up!!
+
+## Notes for future etc.
+
+### Options, config file
+
+yeah
+
+### Migrations
+
+We use [sqlx CLI](https://lib.rs/crates/sqlx-cli) for database migrations.
+
+We're using the sqlx library features to do our own built-in support for the simplest path — run with `--migrate` to run pending migrations, set `validate_migrations` in the config file for a startup-time safety check, run with `--status` to see the deets, etc.
+
+But for any nastier form of db repair, you'll want the sqlx CLI itself and a copy of the migrations dir from the source.
