@@ -7,7 +7,7 @@ use super::users::Users;
 use sqlx::{migrate::Migrate, SqlitePool};
 use thiserror::Error;
 use tokio_util::task::TaskTracker;
-use tracing::debug;
+use tracing::{debug, info};
 
 /// The app's main database helper type. One of these goes in the app state,
 /// and you can use it to access all the various resource methods, namespaced
@@ -61,13 +61,14 @@ impl Db {
             .collect();
 
         let mut errs = MigrationError::default();
-        let mut total = 0usize;
+        let mut unrecognized = 0usize;
+        let mut total_known = 0usize;
 
         for known in migrator
             .iter()
             .filter(|&m| !m.migration_type.is_down_migration())
         {
-            total += 1;
+            total_known += 1;
             match applied_migrations.get(&known.version) {
                 Some(checksum) => {
                     if *checksum != known.checksum {
@@ -78,8 +79,12 @@ impl Db {
             }
             applied_migrations.remove(&known.version);
         }
-        errs.unrecognized += applied_migrations.len();
-        debug!("{} total migrations", total);
+        unrecognized += applied_migrations.len();
+        debug!("{} known migrations", total_known);
+        info!(
+            "{} unrecognized database migrations; are you running an old app version?",
+            unrecognized
+        );
 
         if errs.any() {
             Err(errs.into())
@@ -90,16 +95,15 @@ impl Db {
 }
 
 #[derive(Error, Default, Debug)]
-#[error("bad migration situation: {unapplied} unapplied, {wrong_checksum} busted, {unrecognized} unrecognized.")]
+#[error("bad migration situation: {unapplied} unapplied, {wrong_checksum} busted.")]
 pub struct MigrationError {
     wrong_checksum: usize,
-    unrecognized: usize,
     unapplied: usize,
 }
 
 impl MigrationError {
     pub fn any(&self) -> bool {
-        self.wrong_checksum + self.unapplied + self.unrecognized > 0
+        self.wrong_checksum + self.unapplied > 0
     }
 }
 
