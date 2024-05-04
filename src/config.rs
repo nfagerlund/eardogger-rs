@@ -1,5 +1,8 @@
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
+use std::{
+    num::NonZeroUsize,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 use url::Url;
 
@@ -10,19 +13,27 @@ pub enum ConfError {
     Impossible,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub enum ServeMode {
+    #[serde(alias = "http")]
+    Http { port: u16 },
+    #[serde(alias = "fcgi")]
+    Fcgi { max_connections: NonZeroUsize },
+}
+
 /// Stuff the app needs that's sourced from configuration.
 #[derive(Clone, Debug)]
 pub struct DogConfig {
     /// Whether we're running in production or not. Currently not really consulted
     /// for anything.
     pub production: bool,
+    /// Whether to serve in FastCGI or HTTP mode, with mode-specific settings embedded.
+    pub mode: ServeMode,
     /// Whether to check the integrity of database migrations before continuing
     /// startup.
     pub validate_migrations: bool,
     /// The site's own public-facing base URL.
     pub public_url: Url,
-    /// The port to listen on, if running our own http server.
-    pub port: u16,
     /// The location of the database file.
     pub db_file: PathBuf,
     /// The directory with static CSS/JS/image assets.
@@ -37,9 +48,9 @@ pub struct DogConfig {
 #[derive(Debug, Deserialize)]
 struct PreDogConfig {
     production: bool,
+    mode: ServeMode,
     validate_migrations: bool,
     public_url: String,
-    port: u16,
     // These three file paths can be absolute, or relative to the config file's dir.
     db_file: String,
     assets_dir: String,
@@ -57,15 +68,15 @@ impl PreDogConfig {
         // Chomp the rest
         let Self {
             production,
+            mode,
             validate_migrations,
-            port,
             ..
         } = self;
         Ok(DogConfig {
             production,
+            mode,
             validate_migrations,
             public_url,
-            port,
             db_file,
             assets_dir,
             key_file,
@@ -91,9 +102,9 @@ impl DogConfig {
     pub fn temp_test() -> anyhow::Result<Self> {
         let pre = PreDogConfig {
             production: false,
+            mode: ServeMode::Http { port: 443 },
             validate_migrations: false,
             public_url: "http://eardogger.com".to_string(),
-            port: 443,
             // tests build their own in-memory db pools anyway.
             db_file: "ignore_me".to_string(),
             assets_dir: "public".to_string(),

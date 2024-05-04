@@ -111,11 +111,24 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Serve the website til we're done!
-    info!("starting main server loop");
-    let listener = TcpListener::bind(("0.0.0.0", config.port)).await?;
-    let serve_result = axum::serve(listener, app)
-        .with_graceful_shutdown(cancel_token.clone().cancelled_owned())
-        .await;
+    let serve_result = match config.mode {
+        ServeMode::Http { port } => {
+            info!("starting main HTTP server loop, serving on port {}", port);
+            let listener = TcpListener::bind(("0.0.0.0", port)).await?;
+            axum::serve(listener, app)
+                .with_graceful_shutdown(cancel_token.clone().cancelled_owned())
+                .await
+        }
+        ServeMode::Fcgi { max_connections } => {
+            info!("starting main FastCGI server loop");
+            busride_rs::serve_fcgid_with_graceful_shutdown(
+                app,
+                max_connections,
+                cancel_token.clone().cancelled_owned(),
+            )
+            .await
+        }
+    };
 
     // Clean up:
     if let Err(e) = serve_result {
