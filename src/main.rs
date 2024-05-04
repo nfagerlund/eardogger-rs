@@ -28,14 +28,6 @@ use crate::config::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // tokio console stuff:
-    // - re-enable the console-subscriber dep
-    // - need unstable features, so RUSTFLAGS="--cfg tokio_unstable" cargo build
-    // - need `tokio=trace,runtime=trace` (in RUST_LOG or default filter)
-    // let console_layer = console_subscriber::spawn(); // default values
-    // .with(console_layer)
-    // all this is onerous enough that I'm inclined to not leave it enabled.
-
     // Get args
     let options = args::cli_options();
 
@@ -48,7 +40,6 @@ async fn main() -> anyhow::Result<()> {
     // Set up tracing. TODO: log file appender from config
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .with(tracing_tracy::TracyLayer::default())
         .with(fmt_layer())
         .init();
 

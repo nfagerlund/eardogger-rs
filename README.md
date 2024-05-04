@@ -46,3 +46,15 @@ We use [sqlx CLI](https://lib.rs/crates/sqlx-cli) for database migrations.
 We're using the sqlx library features to do our own built-in support for the simplest path — run with `--migrate` to run pending migrations, set `validate_migrations` in the config file for a startup-time safety check, run with `--status` to see the deets, etc.
 
 But for any nastier form of db repair, you'll want the sqlx CLI itself and a copy of the migrations dir from the source.
+
+### tokio-console stuff
+
+console's cool and all, but the requirements are rough:
+
+- re-enable the console-subscriber dep
+- need unstable features, so RUSTFLAGS="--cfg tokio_unstable" cargo build
+- need `tokio=trace,runtime=trace` (in RUST_LOG or default filter)
+- `let console_layer = console_subscriber::spawn();` // default values
+- `(subscriber registry)... .with(console_layer)`
+
+all this is onerous enough that I'm inclined to not leave it enabled.
