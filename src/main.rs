@@ -63,6 +63,7 @@ async fn main() -> anyhow::Result<()> {
     let db = Db::new(read_pool, write_pool, tracker.clone());
     // Maybe check the migrations.
     if config.validate_migrations {
+        info!("validating database migrations");
         db.validate_migrations().await?;
     }
 

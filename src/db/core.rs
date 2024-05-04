@@ -90,10 +90,12 @@ impl Db {
         }
         unrecognized += applied_migrations.len();
         debug!("{} known migrations", total_known);
-        info!(
-            "{} unrecognized database migrations; are you running an old app version?",
-            unrecognized
-        );
+        if unrecognized > 0 {
+            info!(
+                "{} unrecognized database migrations; are you running an old app version?",
+                unrecognized
+            );
+        }
 
         if errs.any() {
             Err(errs.into())
