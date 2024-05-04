@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
         None => DogConfig::load("eardogger.toml")?,
     };
 
-    // Set up tracing
+    // Set up tracing. TODO: log file appender from config
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with(tracing_tracy::TracyLayer::default())
