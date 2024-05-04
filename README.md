@@ -21,7 +21,25 @@ Hush up!!
 
 yeah
 
-### Migrations
+### Database
+
+Before you can do literally anything, you need a sqlite database that's been set to WAL mode. Easy enough, though:
+
+```
+sqlite3 dev.db
+PRAGMA journal_mode = WAL;
+.exit
+```
+
+Also your config file needs to be pointing at the DB file.
+
+#### Compilation
+
+We're using sqlx macros for type-checked queries, and that means you can't compile the app at all unless you have `DATABASE_URL` pointed at a fully migrated database file. (You can use a `.env` file (gitignored) to persistently set this.)
+
+I'm gonna do the "prepare" thing for easier compilation, but haven't done it yet.
+
+#### Migrations
 
 We use [sqlx CLI](https://lib.rs/crates/sqlx-cli) for database migrations.
 
