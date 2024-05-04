@@ -69,15 +69,15 @@ async fn main() -> anyhow::Result<()> {
     // do the deed now and exit early.
     if options.migrate {
         info!("--migrate: running database migrations now.");
-        db.run_migrations().await?;
+        db.migrations().run().await?;
         info!("--migrate: finished migrations. see u, space cowboy.");
         return Ok(());
     }
 
-    // We're in normal mode. Maybe check the migrations.
+    // We're in normal mode, but maybe check the migrations.
     if config.validate_migrations {
         info!("validating database migrations");
-        db.validate_migrations().await?;
+        db.migrations().validate().await?;
     }
 
     // Set up the cookie key

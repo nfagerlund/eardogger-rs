@@ -438,5 +438,5 @@ async fn dogears() {
 async fn migrations_test() {
     let db = Db::new_test_db().await;
     // By definition, this just had the migrations run on it. So:
-    db.validate_migrations().await.expect("migrations valid");
+    db.migrations().validate().await.expect("migrations valid");
 }

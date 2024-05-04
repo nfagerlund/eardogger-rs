@@ -84,6 +84,7 @@
 mod core;
 mod db_tests;
 mod dogears;
+mod migrations;
 mod sessions;
 mod tokens;
 mod users;

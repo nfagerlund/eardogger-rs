@@ -1,16 +1,10 @@
-use std::collections::HashMap;
-
 use super::dogears::Dogears;
+use super::migrations::Migrations;
 use super::sessions::Sessions;
 use super::tokens::Tokens;
 use super::users::Users;
-use sqlx::{
-    migrate::{Migrate, Migrator},
-    SqlitePool,
-};
-use thiserror::Error;
+use sqlx::SqlitePool;
 use tokio_util::task::TaskTracker;
-use tracing::{debug, info};
 
 /// The app's main database helper type. One of these goes in the app state,
 /// and you can use it to access all the various resource methods, namespaced
@@ -22,9 +16,6 @@ pub struct Db {
     // Query helpers may spawn SHORT-LIVED async tasks, so need a tracker but not a cancel token.
     pub task_tracker: TaskTracker,
 }
-
-// A baked-in stacic copy of all the database migrations.
-static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 impl Db {
     /// yeah.
@@ -52,69 +43,8 @@ impl Db {
         Sessions::new(self)
     }
 
-    pub async fn run_migrations(&self) -> Result<(), sqlx::migrate::MigrateError> {
-        MIGRATOR.run(&self.write_pool).await
-    }
-
-    /// Check whether the database migrations are in a usable state. For background
-    /// on the logic in here, consult the source of the sqlx CLI:
-    /// https://github.com/launchbadge/sqlx/blob/5d6c33ed65cc2/sqlx-cli/src/migrate.rs
-    /// We're doing basically the same thing.
-    pub async fn validate_migrations(&self) -> anyhow::Result<()> {
-        let mut conn = self.read_pool.acquire().await?;
-        let mut applied_migrations: HashMap<_, _> = conn
-            .list_applied_migrations()
-            .await?
-            .into_iter()
-            .map(|m| (m.version, m.checksum))
-            .collect();
-
-        let mut errs = MigrationError::default();
-        let mut unrecognized = 0usize;
-        let mut total_known = 0usize;
-
-        for known in MIGRATOR
-            .iter()
-            .filter(|&m| !m.migration_type.is_down_migration())
-        {
-            total_known += 1;
-            match applied_migrations.get(&known.version) {
-                Some(checksum) => {
-                    if *checksum != known.checksum {
-                        errs.wrong_checksum += 1;
-                    }
-                }
-                None => errs.unapplied += 1,
-            }
-            applied_migrations.remove(&known.version);
-        }
-        unrecognized += applied_migrations.len();
-        debug!("{} known migrations", total_known);
-        if unrecognized > 0 {
-            info!(
-                "{} unrecognized database migrations; are you running an old app version?",
-                unrecognized
-            );
-        }
-
-        if errs.any() {
-            Err(errs.into())
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[derive(Error, Default, Debug)]
-#[error("bad migration situation: {unapplied} unapplied, {wrong_checksum} busted.")]
-pub struct MigrationError {
-    wrong_checksum: usize,
-    unapplied: usize,
-}
-
-impl MigrationError {
-    pub fn any(&self) -> bool {
-        self.wrong_checksum + self.unapplied > 0
+    pub fn migrations(&self) -> Migrations {
+        Migrations::new(self)
     }
 }
 
@@ -145,12 +75,13 @@ impl Db {
             .min_connections(1);
 
         let write_pool = pool_opts.connect_with(db_opts).await.unwrap();
-        MIGRATOR
-            .run(&write_pool)
+        let read_pool = write_pool.clone();
+        let db = Self::new(read_pool, write_pool, TaskTracker::new());
+        db.migrations()
+            .run()
             .await
             .expect("sqlx-ploded during migrations");
-        let read_pool = write_pool.clone();
-        Self::new(read_pool, write_pool, TaskTracker::new())
+        db
     }
 
     /// Wait for any async writes to settle before continuing to test any
