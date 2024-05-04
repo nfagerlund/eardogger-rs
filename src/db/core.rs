@@ -4,7 +4,10 @@ use super::dogears::Dogears;
 use super::sessions::Sessions;
 use super::tokens::Tokens;
 use super::users::Users;
-use sqlx::{migrate::Migrate, SqlitePool};
+use sqlx::{
+    migrate::{Migrate, Migrator},
+    SqlitePool,
+};
 use thiserror::Error;
 use tokio_util::task::TaskTracker;
 use tracing::{debug, info};
@@ -19,6 +22,9 @@ pub struct Db {
     // Query helpers may spawn SHORT-LIVED async tasks, so need a tracker but not a cancel token.
     pub task_tracker: TaskTracker,
 }
+
+// A baked-in stacic copy of all the database migrations.
+static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 impl Db {
     /// yeah.
@@ -47,11 +53,14 @@ impl Db {
     }
 
     pub async fn run_migrations(&self) -> Result<(), sqlx::migrate::MigrateError> {
-        sqlx::migrate!("./migrations").run(&self.write_pool).await
+        MIGRATOR.run(&self.write_pool).await
     }
 
+    /// Check whether the database migrations are in a usable state. For background
+    /// on the logic in here, consult the source of the sqlx CLI:
+    /// https://github.com/launchbadge/sqlx/blob/5d6c33ed65cc2/sqlx-cli/src/migrate.rs
+    /// We're doing basically the same thing.
     pub async fn validate_migrations(&self) -> anyhow::Result<()> {
-        let migrator = sqlx::migrate!("./migrations");
         let mut conn = self.read_pool.acquire().await?;
         let mut applied_migrations: HashMap<_, _> = conn
             .list_applied_migrations()
@@ -64,7 +73,7 @@ impl Db {
         let mut unrecognized = 0usize;
         let mut total_known = 0usize;
 
-        for known in migrator
+        for known in MIGRATOR
             .iter()
             .filter(|&m| !m.migration_type.is_down_migration())
         {
@@ -134,7 +143,7 @@ impl Db {
             .min_connections(1);
 
         let write_pool = pool_opts.connect_with(db_opts).await.unwrap();
-        sqlx::migrate!("./migrations")
+        MIGRATOR
             .run(&write_pool)
             .await
             .expect("sqlx-ploded during migrations");
