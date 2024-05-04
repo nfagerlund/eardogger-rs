@@ -5,14 +5,14 @@ use std::path::PathBuf;
 // oh, lol, I already have clap in my cargo.toml. well.... anyway.
 
 pub struct Options {
-    /// --config lets you specify the path of the config file to use.
+    /// `--config` lets you specify the path of the config file to use.
     /// It's optional; if omitted, we'll use eardogger.toml in the current
     /// working directory.
     pub config: Option<PathBuf>,
-    /// --migrate runs any pending database migrations, and then exits instead
+    /// `--migrate` runs any pending database migrations, and then exits instead
     /// of starting the server.
     pub migrate: bool,
-    /// --status prints the current database migrations status and then exits.
+    /// `--status` prints the current database migrations status and then exits.
     pub status: bool,
 }
 

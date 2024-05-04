@@ -65,13 +65,23 @@ async fn main() -> anyhow::Result<()> {
     let write_pool = db_pool(&config.db_file, 1).await?;
     let db = Db::new(read_pool, write_pool, tracker.clone());
 
-    // If we're in the "run migrations" mode instead of our normal mode,
+    // If we're in one of our "do migrations" modes instead of our normal mode,
     // do the deed now and exit early.
     if options.migrate {
-        info!("--migrate: running database migrations now.");
+        println!("--migrate: running database migrations now.");
         db.migrations().run().await?;
+        println!("--migrate: finished migrations. see u, space cowboy.");
+
         db.close().await;
-        info!("--migrate: finished migrations. see u, space cowboy.");
+        return Ok(());
+    } else if options.status {
+        println!("Database migrations status:");
+        let statuses = db.migrations().info().await?;
+        for status in statuses.iter() {
+            println!("{}", status);
+        }
+
+        db.close().await;
         return Ok(());
     }
 
