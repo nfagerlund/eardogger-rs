@@ -4,18 +4,51 @@ use std::path::PathBuf;
 
 // oh, lol, I already have clap in my cargo.toml. well.... anyway.
 
-/// The --config option lets you specify the path of the config file
-/// to use. It's optional; if omitted, we'll use eardogger.toml in the current
-/// working directory.
-pub fn config_path() -> Option<PathBuf> {
-    let mut args = std::env::args();
-    let Some(_) = args.find(|a| a == "--config") else {
-        return None;
-    };
-    let Some(p) = args.next() else {
-        // This runs before we have a tracing subscriber, so we have to log rudely.
-        println!("Startup: received --config without a config path; ignoring!");
-        return None;
-    };
-    Some(PathBuf::from(p))
+pub struct Options {
+    /// The --config option lets you specify the path of the config file
+    /// to use. It's optional; if omitted, we'll use eardogger.toml in the current
+    /// working directory.
+    pub config: Option<PathBuf>,
+    pub migrate: bool,
+}
+
+enum ParserState {
+    Scanning,
+    ConfigVal,
+}
+
+pub fn cli_options() -> Options {
+    let mut config = None;
+    let mut migrate = false;
+
+    let mut state = ParserState::Scanning;
+    for arg in std::env::args() {
+        match state {
+            ParserState::Scanning => {
+                // I think the correct thing would be to do a tokenization pass
+                // first and then do an exhaustive match on token kind. But once I'm
+                // considering that, it's time to roll in clap.
+                if arg == "--migrate" {
+                    migrate = true;
+                } else if arg == "--config" {
+                    state = ParserState::ConfigVal;
+                }
+                // otherwise ignore.
+            }
+            ParserState::ConfigVal => {
+                config = Some(PathBuf::from(arg));
+                state = ParserState::Scanning;
+            }
+        }
+    }
+    // cleanup, once all args are consumed
+    match state {
+        ParserState::Scanning => (),
+        ParserState::ConfigVal => {
+            // This runs before we have a tracing subscriber, so we have to log rudely.
+            println!("Startup: received --config without a config path; ignoring!");
+        }
+    }
+
+    Options { config, migrate }
 }

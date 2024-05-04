@@ -36,8 +36,11 @@ async fn main() -> anyhow::Result<()> {
     // .with(console_layer)
     // all this is onerous enough that I'm inclined to not leave it enabled.
 
+    // Get args
+    let options = args::cli_options();
+
     // Get the config
-    let config = match args::config_path() {
+    let config = match options.config {
         Some(path) => DogConfig::load(path)?,
         None => DogConfig::load("eardogger.toml")?,
     };
