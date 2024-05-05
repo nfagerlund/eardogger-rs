@@ -76,3 +76,5 @@ CGIPassAuth On
 ```
 
 Also, need to put a dummy index.html file in the site's root dir to turn off the interposed "site almost ready!!" page that dreamhost does if you haven't uploaded anything (i guess .htaccess don't count).
+
+Also, you must have the `AllowEncodedSlashes NoDecode` directive set on your domain's VirtualHost, for the /mark/:url endpoint to work. (Note that some apache versions don't properly inherit a global value into vhosts.) DreamHost has this set by default, it seems, but I had to add it in my local playground. (On further consideration, I might want to switch the /mark/ endpoint to prefer using a query param, for more reliable compatibility in the future.)
