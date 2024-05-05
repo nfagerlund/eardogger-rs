@@ -78,3 +78,5 @@ CGIPassAuth On
 Also, need to put a dummy index.html file in the site's root dir to turn off the interposed "site almost ready!!" page that dreamhost does if you haven't uploaded anything (i guess .htaccess don't count).
 
 Also, you must have the `AllowEncodedSlashes NoDecode` directive set on your domain's VirtualHost, for the /mark/:url endpoint to work. (Note that some apache versions don't properly inherit a global value into vhosts.) DreamHost has this set by default, it seems, but I had to add it in my local playground. (On further consideration, I might want to switch the /mark/ endpoint to prefer using a query param, for more reliable compatibility in the future.)
+
+Logging: mod_fcgid connects both the stderr and stdout of your process to the apache server's MAIN ErrorLog, not your vhost's log. So you want to be EXTREMELY quiet on your main pipes if you're running on a shared host, and you need to run your own logfile appender and rotator if you want visibility.
