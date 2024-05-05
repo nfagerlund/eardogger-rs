@@ -48,3 +48,4 @@ percent-encoding = "2.3.1"
 # Clean-up:
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 toml = "0.8.12"
+tracing-appender = "0.2.3"
