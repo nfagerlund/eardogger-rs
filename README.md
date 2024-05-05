@@ -21,6 +21,10 @@ Hush up!!
 
 yeah
 
+### Data dir
+
+Oh right, you also need a copy of the public directory. And a place to keep your keyfile. So, I'll want to distribute stuff along with the binary.
+
 ### Database
 
 Before you can do literally anything, you need a sqlite database that's been set to WAL mode. Easy enough, though:
@@ -58,3 +62,14 @@ console's cool and all, but the requirements are rough:
 - `(subscriber registry)... .with(console_layer)`
 
 all this is onerous enough that I'm inclined to not leave it enabled.
+
+### stuff I learned while deploying to soak test
+
+```
+# Disable dreamhost's default cache headers and let the app manage its own stuff
+<IfModule mod_expires.c>
+  ExpiresActive off
+</IfModule>
+```
+
+Also, need to put a dummy index.html file in the site's root dir to turn off the interposed "site almost ready!!" page that dreamhost does if you haven't uploaded anything (i guess .htaccess don't count).
