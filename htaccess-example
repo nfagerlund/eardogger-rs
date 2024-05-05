@@ -1,0 +1,15 @@
+# This is an example .htaccess file for serving the app via Apache2's mod_fcgid.
+# See the README for more details.
+
+# Main app install
+Options +ExecCGI -Indexes
+SetHandler fcgid-script
+FcgidWrapper "/home/YOU/bin/eardogger-rs --config /home/YOU/DATA-DIR/eardogger.toml" virtual
+
+# Disable any default cache headers so the app can manage its own caching
+<IfModule mod_expires.c>
+  ExpiresActive off
+</IfModule>
+
+# Allow Authorization header to reach the app (Apache requires explicit opt-in for this)
+CGIPassAuth On

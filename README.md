@@ -70,6 +70,9 @@ all this is onerous enough that I'm inclined to not leave it enabled.
 <IfModule mod_expires.c>
   ExpiresActive off
 </IfModule>
+
+# Enable pass-through of Authorization header (requires explicit opt-in)
+CGIPassAuth On
 ```
 
 Also, need to put a dummy index.html file in the site's root dir to turn off the interposed "site almost ready!!" page that dreamhost does if you haven't uploaded anything (i guess .htaccess don't count).
