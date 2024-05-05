@@ -7,7 +7,7 @@
 /* Vars */
 
 :root {
-  --color-background: #FFF8EB;
+  --color-background: #fff8eb;
   --color-text: #282828;
   --color-link: #265c92;
   --color-link-visited: #7244c8;
@@ -25,13 +25,15 @@
   --font-text: "Avenir Next", "Avenir", "Candara", "Verdana", sans-serif;
   --font-mono: "Courier Prime", "Courier", "Courier New", monospace;
   /* still waitin on universal support for "system-ui", sigh. */
-  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", Helvetica, Arial,
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 
 /* Dark mode */
 @media screen and (prefers-color-scheme: dark) {
   :root {
-    --color-background: #092A37;
+    --color-background: #092a37;
     --color-text: #e4c485;
     --color-link: #62a4e6;
     --color-link-visited: #9d7bdd;
@@ -54,7 +56,19 @@ body {
   padding: 0 1em;
 }
 
-header, nav, footer, form, h1, h2, h3, h4, h5, h6, .dogears, .serial-name, .countdown {
+header,
+nav,
+footer,
+form,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.dogears,
+.serial-name,
+.countdown {
   font-family: var(--font-display);
 }
 
@@ -96,7 +110,9 @@ button {
   cursor: pointer;
 }
 
-input, .mock-input, textarea {
+input,
+.mock-input,
+textarea {
   display: block;
   margin-bottom: 10px;
   margin-top: 5px;
@@ -107,7 +123,8 @@ input, .mock-input, textarea {
   font-size: 16px;
 }
 
-input, button {
+input,
+button {
   height: var(--measure-input-height);
 }
 
@@ -125,7 +142,9 @@ textarea {
 }
 
 /* :read-only pseudo-class is in spec hell, alas. */
-.mock-input, input[type="text"].read-only, textarea.read-only {
+.mock-input,
+input[type="text"].read-only,
+textarea.read-only {
   color: var(--color-disabled);
   background-color: inherit;
 }
@@ -177,17 +196,20 @@ form#logout {
   padding-right: 0;
 }
 
-.serial-name { /* on the marked page */
+.serial-name {
+  /* on the marked page */
   font-weight: bold;
 }
 
 /* Grid for dogear items */
 
-#dogears, #tokens-list {
+#dogears,
+#tokens-list {
   padding-left: 0;
 }
 
-#dogears li, .token {
+#dogears li,
+.token {
   list-style: none;
   display: grid;
   grid-row-gap: 5px;
@@ -197,7 +219,8 @@ form#logout {
   border-bottom: 1px solid;
 }
 
-#dogears li:last-child, .token:last-child {
+#dogears li:last-child,
+.token:last-child {
   border-bottom: 0;
 }
 
@@ -216,7 +239,8 @@ form#logout {
   max-width: 100%;
 }
 
-#dogears a { /* main link */
+#dogears a {
+  /* main link */
   grid-area: link;
   justify-self: self-start; /* no invisible click targets */
 }
@@ -237,7 +261,9 @@ form#logout {
 
 .delete-button {
   max-width: 6em; /* that's a hack around inability to transition auto values. */
-  transition: max-width 1s linear, background-color .5s ease-out;
+  transition:
+    max-width 1s linear,
+    background-color 0.5s ease-out;
   white-space: nowrap;
   overflow-x: hidden;
 }
@@ -255,8 +281,11 @@ form#logout {
   grid-area: date;
 }
 
-#dogears .current, #dogears .date,
-.token-scope, .token-created, .token-last-used {
+#dogears .current,
+#dogears .date,
+.token-scope,
+.token-created,
+.token-last-used {
   font-size: smaller;
   font-family: var(--font-text);
   color: var(--color-disabled);
@@ -268,21 +297,26 @@ form#logout {
   grid-template-areas:
     "comment comment comment delete"
     "last last created created"
-    "scope scope scope scope"
-    ;
+    "scope scope scope scope";
 }
 
-.token-comment { grid-area: comment; }
+.token-comment {
+  grid-area: comment;
+}
 .token-delete {
   grid-area: delete;
   align-self: center;
 }
-.token-scope { grid-area: scope; }
+.token-scope {
+  grid-area: scope;
+}
 .token-created {
   grid-area: created;
   justify-self: end;
 }
-.token-last-used { grid-area: last; }
+.token-last-used {
+  grid-area: last;
+}
 
 .columns {
   display: flex;
@@ -300,9 +334,9 @@ form#logout {
 
 .tabs .tab {
   padding: 1em;
-  margin: 0 .25em;
+  margin: 0 0.25em;
   border-top-left-radius: 1em;
-  border-top-right-radius: .5em;
+  border-top-right-radius: 0.5em;
   border-color: var(--color-border);
   border-style: solid;
   border-width: 1px 1px 0 1px;
@@ -314,12 +348,12 @@ form#logout {
 .tabs .tab.active {
   background-color: transparent;
   text-decoration: underline;
-  box-shadow: 0 0 .5em var(--color-shadow);
+  box-shadow: 0 0 0.5em var(--color-shadow);
 }
 
 .tabs {
   margin-top: 1em;
-  padding-top: .5em;
+  padding-top: 0.5em;
   overflow-y: hidden; /* No box-shadow on bottom, this way. */
   border-bottom: 1px var(--color-border) solid;
   display: flex;
@@ -329,7 +363,7 @@ form#logout {
 }
 
 .tabbed-instructions[data-show="desktop"] .only:not(.desktop),
-.tabbed-instructions[data-show="ios"]     .only:not(.ios),
+.tabbed-instructions[data-show="ios"] .only:not(.ios),
 .tabbed-instructions[data-show="android"] .only:not(.android) {
   display: none;
 }
@@ -339,9 +373,9 @@ form#logout {
 }
 
 .cartouche {
-	border: 1px var(--color-border) solid;
-	padding: .1em .3em;
-	border-radius: var(--measure-border-radius);
+  border: 1px var(--color-border) solid;
+  padding: 0.1em 0.3em;
+  border-radius: var(--measure-border-radius);
 }
 
 /* Be good on smalls */
@@ -364,7 +398,8 @@ form#logout {
   font-weight: bold;
 }
 
-.help, aside {
+.help,
+aside {
   font-size: smaller;
 }
 
