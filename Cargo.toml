@@ -10,17 +10,31 @@ edition = "2021"
 opt-level = 2
 
 [dependencies]
-# Foundations:
+# Runtime foundations:
 tokio = { version = "1.36.0", features = ["full"] }
 tokio-util = { version = "0.7.10", features = ["rt"] }
 tower = "0.4.13"
+busride-rs = { git = "https://github.com/nfagerlund/busride-rs", rev = "ce669be" }
+
+# Serialization/formats/parsing:
+serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.115"
+toml = "0.8.12"
+url = "2.5.0"
+html-escape = "0.2.13"
+percent-encoding = "2.3.1"
+
+# Utility stuff:
 anyhow = "1.0.79"
 thiserror = "1.0.58"
-tracing = "0.1.40"
-serde = { version = "1", features = ["derive"] }
 regex = "1.10.3"
 lazy_static = "1.4.0"
+time = { version = "0.3.34", features = ["serde"] }
+
+# Tracing:
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-appender = "0.2.3"
 
 # Database:
 sqlx = { version = "0.7.4", features = [
@@ -29,7 +43,6 @@ sqlx = { version = "0.7.4", features = [
     "tls-rustls",
     "time",
 ] }
-time = { version = "0.3.34", features = ["serde"] }
 
 # Crypto/randomness/hashing/etc:
 rand = "0.8.5"
@@ -43,13 +56,6 @@ axum = { version = "0.7.4" }
 http = "1.1.0"
 tower-cookies = { version = "0.10.0", features = ["axum-core", "signed"] }
 tower-http = { version = "0.5.2", features = ["fs"] }
-busride-rs = { git = "https://github.com/nfagerlund/busride-rs", rev = "ce669be" }
 minijinja = { version = "1.0.12", features = ["json"] }
-url = "2.5.0"
-html-escape = "0.2.13"
-percent-encoding = "2.3.1"
 
 # Clean-up:
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-toml = "0.8.12"
-tracing-appender = "0.2.3"
