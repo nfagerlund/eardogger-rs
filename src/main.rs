@@ -72,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
-    // Ok, there we go.
+    // Ok, there we go. Beyond this point, we can now log with tracing!
     tracing_subscriber::registry()
         .with(EnvFilter::new(&config.log.filter))
         .with(stdout_layer)
@@ -89,6 +89,10 @@ async fn main() -> anyhow::Result<()> {
     // This is a low-traffic service running on shared hardware, so go easy on parallelism.
     // Up to (cores - 2) threads, with a minimum of 2.
     let max_readers = cores.saturating_sub(2).max(2);
+    debug!(
+        "{} cores available, limiting db reader threads to {}",
+        cores, max_readers
+    );
     let read_pool = db_pool(&config.db_file, max_readers).await?;
     let write_pool = db_pool(&config.db_file, 1).await?;
     let db = Db::new(read_pool, write_pool, tracker.clone());
@@ -126,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
     let templates = load_templates()?;
     let inner = DSInner {
         db: db.clone(),
-        config: config.clone(),
+        config,
         templates,
         cookie_key: key,
         task_tracker: tracker.clone(),
@@ -135,7 +139,7 @@ async fn main() -> anyhow::Result<()> {
     let state: DogState = Arc::new(inner);
 
     // ok, ok,...
-    let app = eardogger_app(state);
+    let app = eardogger_app(state.clone());
 
     // Spawn the shutdown signal listener, outside the tracker
     tokio::spawn(cancel_on_terminate(cancel_token.clone()));
@@ -147,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Serve the website til we're done!
-    let serve_result = match config.mode {
+    let serve_result = match state.config.mode {
         ServeMode::Http { port } => {
             info!("starting main HTTP server loop, serving on port {}", port);
             let listener = TcpListener::bind(("0.0.0.0", port)).await?;
@@ -185,14 +189,14 @@ async fn main() -> anyhow::Result<()> {
 async fn load_cookie_key(path: impl AsRef<Path>) -> tokio::io::Result<Key> {
     let path = path.as_ref();
     if fs::try_exists(path).await? {
-        info!("loading existing cookie keyfile at {:?}", path);
+        debug!("loading existing cookie keyfile at {:?}", path);
         let mut f = File::open(path).await?;
         let mut keybuf = [0u8; 64];
         f.read_exact(&mut keybuf).await?;
         let key = Key::from(&keybuf);
         Ok(key)
     } else {
-        info!("generating new cookie keyfile at {:?}", path);
+        debug!("generating new cookie keyfile at {:?}", path);
         let mut f = File::options()
             .write(true)
             .create_new(true)

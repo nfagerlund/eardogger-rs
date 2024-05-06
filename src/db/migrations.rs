@@ -5,7 +5,7 @@ use sqlx::{
 };
 use std::{borrow::Cow, collections::HashMap, fmt::Display};
 use thiserror::Error;
-use tracing::{debug, info};
+use tracing::{debug, warn};
 
 // A baked-in stacic copy of all the database migrations.
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
@@ -31,6 +31,7 @@ impl MigrationError {
     }
 }
 
+/// The current state of an individual database migration.
 #[derive(Debug)]
 pub enum Status {
     Applied {
@@ -68,6 +69,9 @@ impl Display for Status {
                 applied_checksum: have,
                 intended_checksum: want,
             } => {
+                // Actually this checksum formatting is pretty rough.
+                // But the situation is also pretty rough and you'll need
+                // the sqlx cli in a sec anyway, so hey.
                 write!(
                     f,
                     "{v} (!!BUSTED!!) {d} - have {have:02x?}, want {want:02x?}"
@@ -140,7 +144,7 @@ impl<'a> Migrations<'a> {
         unrecognized += applied_migrations.len();
         debug!("{} known migrations", total_known);
         if unrecognized > 0 {
-            info!(
+            warn!(
                 "{} unrecognized database migrations; are you running an old app version?",
                 unrecognized
             );
