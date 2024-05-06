@@ -13,6 +13,7 @@ pub enum ConfError {
     Impossible,
 }
 
+/// Settings for running the app server.
 #[derive(Debug, Deserialize, Clone)]
 pub enum ServeMode {
     #[serde(alias = "http")]
@@ -21,17 +22,26 @@ pub enum ServeMode {
     Fcgi { max_connections: NonZeroUsize },
 }
 
+/// Settings for logging
 #[derive(Debug, Deserialize, Clone)]
 pub struct LogConfig {
+    /// A [`tracing_subscriber::EnvFilter`] string.
     pub filter: String,
+    /// Whether to log to stdout. Always set false under fcgi, because
+    /// mod_fcgid spams the server's global ErrorLog.
     pub stdout: bool,
+    /// Whether to log to an auto-rotating log file.
     pub file: Option<LogFileConfig>,
 }
 
+/// Settings for logging to an auto-rotating log file.
 #[derive(Debug, Deserialize, Clone)]
 pub struct LogFileConfig {
+    /// The directory to use for log files.
     pub directory: PathBuf,
+    /// The log file prefix. Files will have names like <name>.<timestamp>.log.
     pub name: String,
+    /// How many days of logs to keep. Excess logs are auto-deleted.
     pub days: usize,
 }
 
@@ -125,7 +135,7 @@ impl DogConfig {
     }
 
     #[cfg(test)]
-    pub fn temp_test() -> anyhow::Result<Self> {
+    pub fn test_config() -> anyhow::Result<Self> {
         let pre = PreDogConfig {
             production: false,
             mode: ServeMode::Http { port: 443 },

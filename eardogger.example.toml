@@ -1,5 +1,25 @@
+# Eardogger config file
+# Use the `--config <FILE>` option to pick a config location. If omitted,
+# we try to find eardogger.toml in the current working directory.
+#
+# All the settings here are mandatory unless otherwise stated, and the
+# app will fail to start if the config file isn't valid. Running the
+# app binary with the `--status` option is an easy way to check the config
+# before upgrading the server to a new version.
+#
+# All of the file/directory settings can be either relative or absolute paths.
+# Relative paths are resolved relative to the config file's location.
+
+# Whether we're running in production or not. Currently not really consulted
+# for anything, but later it might affect verbosity of web errors.
 production = false
+
+# Whether to check the integrity of database migrations on every startup.
+# If migrations are behind or corrupt, the app will exit instead of
+# potentially messing up user data.
 validate_migrations = true
+
+# The site's own public-facing base URL.
 public_url = "http://localhost:3000"
 db_file = "dev.db"
 assets_dir = "public"
@@ -19,14 +39,20 @@ stdout = true
 # daily "<name>.<timestamp>.log" files to <directory>, keeping <days>
 # days worth and deleting any older ones.
 [log.file]
+# The directory to use for log files.
 directory = "logs"
+# The log file prefix. Files will have names like <name>.<timestamp>.log.
 name = "eardogger"
+# How many days of logs to keep. Excess logs are auto-deleted.
 days = 5
 
 # Choose ONE group of mode settings, either http or fcgi.
 [mode.http]
+# The port to listen on.
 port = 3000
 
 # or, alternately:
 # [mode.fcgi]
+# The maximum number of connections to serve at once. Above this number,
+# new connections will have to wait and will get higher latency.
 # max_connections = 50

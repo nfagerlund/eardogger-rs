@@ -20,7 +20,7 @@ use crate::config::DogConfig;
 
 async fn test_state() -> DogState {
     let db = crate::db::Db::new_test_db().await;
-    let config = DogConfig::temp_test().unwrap();
+    let config = DogConfig::test_config().unwrap();
     let templates = load_templates().unwrap();
     let inner = DSInner {
         db,
