@@ -3,7 +3,11 @@ name = "eardogger-rs"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# Per the sqlx readme: the macros are hefty, so speeding them up
+# in dev builds can have noticable effects. Note that cargo's `test`
+# profile inherits from `dev`.
+[profile.dev.package.sqlx-macros]
+opt-level = 2
 
 [dependencies]
 # Foundations:

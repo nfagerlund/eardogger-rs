@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE sessions\n            SET expires = datetime('now', '+1 day')\n            WHERE id = ?\n            RETURNING expires;\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "expires",
+        "ordinal": 0,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "563a64fc40ce19c006426869f48197145fbe50b17eaf96dac25a88d50485f96b"
+}

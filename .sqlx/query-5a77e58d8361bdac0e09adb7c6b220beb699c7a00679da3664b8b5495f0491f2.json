@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT last_used\n            FROM tokens\n            WHERE id = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_used",
+        "ordinal": 0,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "5a77e58d8361bdac0e09adb7c6b220beb699c7a00679da3664b8b5495f0491f2"
+}

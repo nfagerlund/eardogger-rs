@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT count(id) AS 'count: u32' FROM dogears\n                WHERE user_id = ?;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count: u32",
+        "ordinal": 0,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "689561601b57d74af29b9657415abe572a3aee27cf76a32044943e97f7fc26dc"
+}

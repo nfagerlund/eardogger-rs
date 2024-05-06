@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT expires\n            FROM sessions\n            WHERE id = ?;\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "expires",
+        "ordinal": 0,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "19cd07e027508cba9c42b0a37ef6cd5b579182855e807b69ed44e416c72aba94"
+}

@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO sessions (id, user_id, csrf_token, expires)\n                VALUES (?1, ?2, ?3, datetime(?4))\n                RETURNING id, user_id, csrf_token, expires;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "csrf_token",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "expires",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8d91e54e2160a9c1a113ae6987905915004580f7537d3b7279b9562ca4ca19fe"
+}

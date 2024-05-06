@@ -39,9 +39,23 @@ Also your config file needs to be pointing at the DB file.
 
 #### Compilation
 
-We're using sqlx macros for type-checked queries, and that means you can't compile the app at all unless you have `DATABASE_URL` pointed at a fully migrated database file. (You can use a `.env` file (gitignored) to persistently set this.)
+We're using sqlx macros for type-checked queries, so it needs database info DURING compilation. Pretty wild!
 
-I'm gonna do the "prepare" thing for easier compilation, but haven't done it yet.
+There's two ways to provide that:
+
+- Point the `DATABASE_URL` env var at a fully migrated database file. (You can use a `.env` file (gitignored) to persistently set this.)
+- Offline mode with cached query data in the `.sqlx` directory: leave `DATABASE_URL` unset, or else set `SQLX_OFFLINE="true"` to override it. No db file needed, appropriate for CI builds etc.
+
+To update the cached query information, you have to run the following two commands:
+
+```
+cargo sqlx prepare
+cargo sqlx prepare -- --tests
+```
+
+(In the latter, `--tests` ends up being passed to rustc.)
+
+I'm gonna try running for a while with a valid DATABASE_URL but offline=true — my theory is that this'll prevent me from accidentally leaving the project in an unbuildable state due to cached queries lagging behind reality.
 
 #### Migrations
 

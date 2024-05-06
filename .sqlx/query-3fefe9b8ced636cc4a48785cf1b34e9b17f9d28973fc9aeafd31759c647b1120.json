@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                DELETE FROM dogears\n                WHERE id = ?1 AND user_id = ?2;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3fefe9b8ced636cc4a48785cf1b34e9b17f9d28973fc9aeafd31759c647b1120"
+}

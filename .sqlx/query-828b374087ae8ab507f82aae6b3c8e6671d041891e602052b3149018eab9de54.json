@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    tokens.id        AS token_id,\n                    tokens.user_id   AS user_id,\n                    tokens.scope     AS token_scope,\n                    tokens.created   AS token_created,\n                    tokens.comment   AS token_comment,\n                    users.username   AS user_username,\n                    users.email      AS user_email,\n                    users.created    AS user_created\n                FROM tokens JOIN users ON tokens.user_id = users.id\n                WHERE tokens.token_hash = ? LIMIT 1;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "token_id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "token_scope",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "token_created",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "token_comment",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_username",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_email",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_created",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "828b374087ae8ab507f82aae6b3c8e6671d041891e602052b3149018eab9de54"
+}

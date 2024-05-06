@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT current\n                FROM dogears\n                WHERE\n                    user_id = ?1 AND\n                    ?2 LIKE prefix || '%'\n                ORDER BY length(prefix) DESC\n                LIMIT 1;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "current",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3ea3cda57d78191266a3756b50a4d77fd35ff180837d4dde1a9db129afcc4499"
+}

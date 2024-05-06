@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO dogears (user_id, prefix, current, display_name)\n                VALUES (?1, ?2, ?3, ?4)\n                RETURNING id, user_id, prefix, current, display_name, updated;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "user_id",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "prefix",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "current",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "247340f9fd13209ea76e3af466cb66c88bb43865a77f13b24562a1ff1a9549cc"
+}

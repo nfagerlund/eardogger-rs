@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    UPDATE sessions SET expires = datetime(?1)\n                    WHERE id = ?2 AND expires > datetime('now');\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "27dc19c1166eb9c850c62320b47c7affeff2952d66ac2e0452556e1bd2eb2daa"
+}
