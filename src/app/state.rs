@@ -22,7 +22,7 @@ pub struct DSInner {
 }
 
 impl DSInner {
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self, ctx))]
     pub fn render_view<S: Serialize + std::fmt::Debug>(
         &self,
         name: &str,
@@ -32,7 +32,7 @@ impl DSInner {
     }
 
     /// Render a bookmarklet template into a `javascript:` URL.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self, token))]
     pub fn render_bookmarklet(
         &self,
         name: &str,

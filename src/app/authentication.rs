@@ -123,7 +123,7 @@ where
 {
     type Rejection = AppError;
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         // We default to HTML error pages... but if this is specifically a json request,
         // we'll remember to render json errors later.
@@ -147,7 +147,7 @@ where
 {
     type Rejection = AppError;
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         // We default to HTML error pages... but if this is specifically a json request,
         // we'll remember to render json errors later.
@@ -186,7 +186,7 @@ where
 
 /// Function middleware to validate a login session and make the logged-in user
 /// available to routes.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn session_middleware(
     State(state): State<DogState>,
     cookies: Cookies,
@@ -224,7 +224,7 @@ pub async fn session_middleware(
 /// Function middleware to validate a token passed in the `Authorization: Bearer STUFF`
 /// header and make the token's user available to routes. This should only be applied
 /// to API routes, and it overrides the session user if both would have been present.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn token_middleware(
     State(state): State<DogState>,
     mut request: Request,

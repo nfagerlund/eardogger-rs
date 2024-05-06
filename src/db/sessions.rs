@@ -107,7 +107,7 @@ impl<'a> Sessions<'a> {
     }
 
     /// Returns Ok(Some) on success, Ok(None) on a well-behaved not-found.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn destroy(&self, sessid: &str) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"
@@ -128,7 +128,7 @@ impl<'a> Sessions<'a> {
     /// Find the user and session for a given session ID (IF the session is
     /// still valid). As a side-effect, updates the session's expiration date
     /// to maintain the rolling window.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn authenticate(&self, sessid: &str) -> anyhow::Result<Option<(Session, User)>> {
         let new_expires = OffsetDateTime::now_utc() + Duration::days(SESSION_LIFETIME_DAYS);
 

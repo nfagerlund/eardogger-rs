@@ -51,7 +51,7 @@ pub async fn status() -> StatusCode {
 
 /// The home page! Shows your dogears list if logged in, and the login
 /// form if not.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn root(
     State(state): State<DogState>,
     Query(query): Query<PaginationQuery>,
@@ -84,7 +84,7 @@ pub async fn root(
 }
 
 /// Kind of like the index page, except 1. no login form, 2. therefore auth required.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn fragment_dogears(
     State(state): State<DogState>,
     Query(query): Query<PaginationQuery>,
@@ -107,7 +107,7 @@ pub async fn fragment_dogears(
 /// - Updating existing dogear in slowmode (countdown to redirect).
 /// - Create new dogear from URL we haven't seen before.
 /// Can fall back to login page on logged out.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn mark_url(
     State(state): State<DogState>,
     maybe_auth: Option<AuthSession>,
@@ -153,7 +153,7 @@ pub struct CreateParams {
 
 /// A POST to the /mark form, which is displayed on the create page. This
 /// creates a new dogear, then displays the marked page (non-slowmode).
-#[tracing::instrument]
+#[tracing::instrument(skip(state, auth))]
 pub async fn post_mark(
     State(state): State<DogState>,
     auth: AuthSession,
@@ -194,7 +194,7 @@ pub async fn post_mark(
 /// - If logged out, show the login page.
 /// Since this might be a Redirect OR a page, we need to return Result on the happy path
 /// and manually convert to it.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn resume(
     State(state): State<DogState>,
     maybe_auth: Option<AuthSession>,
@@ -226,7 +226,7 @@ pub async fn resume(
 
 /// Display the faq/news/about page. This is almost a static page, but
 /// if there's a user around, we want them for the layout header.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn faq(
     State(state): State<DogState>,
     maybe_auth: Option<AuthSession>,
@@ -247,7 +247,7 @@ pub struct PersonalMarkParams {
     csrf_token: String,
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn post_fragment_personalmark(
     State(state): State<DogState>,
     auth: AuthSession,
@@ -284,7 +284,7 @@ pub async fn post_fragment_personalmark(
     ))
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn install(
     State(state): State<DogState>,
     maybe_auth: Option<AuthSession>,
@@ -303,7 +303,7 @@ pub async fn install(
 }
 
 /// The account page. Requires logged-in.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn account(
     State(state): State<DogState>,
     auth: AuthSession,
@@ -324,7 +324,7 @@ pub async fn account(
 }
 
 /// Kind of like the account page.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn fragment_tokens(
     State(state): State<DogState>,
     auth: AuthSession,
@@ -345,7 +345,7 @@ pub async fn fragment_tokens(
 
 /// Handle DELETE for tokens. Effectively an API method, but since it's
 /// only valid for session users, it lives outside the api namespace.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn delete_token(
     State(state): State<DogState>,
     auth: AuthSession,
@@ -359,7 +359,7 @@ pub async fn delete_token(
 }
 
 /// Handle POSTs from the logout button. This redirects to /.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn post_logout(
     State(state): State<DogState>,
     auth: AuthSession,
@@ -407,7 +407,7 @@ pub struct LoginParams {
 /// The form also includes a random token to be used in a signed double-submit
 /// CSRF-prevention scheme; compare it to the cookie to validate that the post came
 /// from a real login form, not a remote-site forgery.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn post_login(
     State(state): State<DogState>,
     cookies: Cookies,
@@ -477,7 +477,7 @@ pub struct SignupParams {
 
 /// Handle POSTs from the signup form. This always appears alongside the login form.
 /// It has some of the same properties, but it always redirects to /.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn post_signup(
     State(state): State<DogState>,
     cookies: Cookies,
@@ -539,7 +539,7 @@ pub struct ChangePasswordParams {
 }
 
 /// The change password form, on the account page. Acts a little like the signup form.
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn post_changepassword(
     State(state): State<DogState>,
     auth: AuthSession,
@@ -578,7 +578,7 @@ pub async fn post_changepassword(
 /// Notably, this is NOT a Handler fn! Since many routes can fall back
 /// to the login form, the idea is to just return an awaited call to
 /// login_form if they hit that branch.
-#[tracing::instrument]
+#[tracing::instrument(skip(state, cookies))]
 async fn login_form(state: DogState, cookies: Cookies, return_to: &str) -> WebResult<Html<String>> {
     let csrf_token = uuid_string();
     // Render the html string first, so we can get some use out of the owned string
@@ -632,7 +632,7 @@ impl ApiDogearsList {
 // Hmm, possibly wanna refactor some of the api handler affordances once this is working right.
 // also, rn the auth extractors reject with WebError, which, maybe not right for api routes.
 // guess I could just maybe_auth em right here. come back to this!
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn api_list(
     State(state): State<DogState>,
     auth: AuthAny,
@@ -648,7 +648,7 @@ pub async fn api_list(
     Ok(Json(ApiDogearsList::new(dogears, meta)))
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn api_delete(
     State(state): State<DogState>,
     auth: AuthAny,
@@ -679,7 +679,7 @@ pub struct ApiCreatePayload {
     display_name: Option<String>,
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state, auth))]
 pub async fn api_create(
     State(state): State<DogState>,
     auth: AuthAny,
@@ -722,7 +722,7 @@ fn set_cors_headers_for_api_update(
     Ok(())
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn api_update_cors_preflight(
     State(state): State<DogState>,
     req_headers: HeaderMap,
@@ -749,7 +749,7 @@ pub struct ApiUpdatePayload {
     current: String,
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub async fn api_update(
     State(state): State<DogState>,
     req_headers: HeaderMap,

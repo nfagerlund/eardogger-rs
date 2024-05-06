@@ -18,7 +18,7 @@ use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower_cookies::Key;
-use tracing::{debug, error, info, info_span};
+use tracing::{debug, error, info};
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
@@ -235,15 +235,15 @@ async fn db_pool(
 /// via either SIGINT (ctrl-c) or SIGTERM (kill), then cancels the provided
 /// CancellationToken. This can be spawned as an independent task, and then
 /// the main logic can just await the cancellation token.
+#[tracing::instrument(skip_all)]
 async fn cancel_on_terminate(cancel_token: CancellationToken) {
-    let span = info_span!("cancel_on_terminate");
     use tokio::signal::{
         ctrl_c,
         unix::{signal, SignalKind},
     };
     let Ok(mut terminate) = signal(SignalKind::terminate()) else {
         // If we can't listen for the signal, bail immediately
-        error!(parent: &span, "couldn't even establish SIGTERM signal listener; taking my ball and going home");
+        error!("couldn't even establish SIGTERM signal listener; taking my ball and going home");
         cancel_token.cancel();
         return;
     };
@@ -253,11 +253,11 @@ async fn cancel_on_terminate(cancel_token: CancellationToken) {
     select! {
         _ = ctrl_c() => {
             // don't care if Ok or Err
-            info!(parent: &span, "received SIGINT, starting shutdown");
+            info!("received SIGINT, starting shutdown");
         },
         _ = terminate.recv() => {
             // don't care if Some or None
-            info!(parent: &span, "received SIGTERM, starting shutdown");
+            info!("received SIGTERM, starting shutdown");
         },
     }
     // Ok, spread the news
@@ -272,9 +272,9 @@ async fn cancel_on_terminate(cancel_token: CancellationToken) {
 /// About the timing: if our process is owned by a web server, we're gonna
 /// need to serve requests immediately upon wakeup, and some of them may
 /// want the db writer. So we want to delay the first purge for several seconds.
+#[tracing::instrument(skip_all)]
 async fn prune_stale_sessions_worker(db: Db, cancel_token: CancellationToken) {
-    let span = info_span!("prune_stale_sessions_worker");
-    info!(parent: &span, "starting up session pruning worker; pausing before first purge");
+    info!("starting up session pruning worker; pausing before first purge");
     let a_day = Duration::from_secs(60 * 60 * 24);
     // Initial delay (or fast-track it on cancel)
     select! {
@@ -282,14 +282,13 @@ async fn prune_stale_sessions_worker(db: Db, cancel_token: CancellationToken) {
         _ = cancel_token.cancelled() => {},
     }
     loop {
-        info!(parent: &span, "purging stale sessions...");
+        info!("purging stale sessions...");
         match db.sessions().delete_expired().await {
             Ok(count) => {
-                info!(parent: &span, "purged {} sessions, going back to sleep", count);
+                info!("purged {} sessions, going back to sleep", count);
             }
             Err(e) => {
                 error!(
-                    parent: &span,
                     "db write error while purging sessions: {}; better luck next time",
                     e
                 );
@@ -304,5 +303,5 @@ async fn prune_stale_sessions_worker(db: Db, cancel_token: CancellationToken) {
             }
         }
     }
-    info!(parent: &span, "shutting down session pruning worker");
+    info!("shutting down session pruning worker");
 }

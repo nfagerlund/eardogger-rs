@@ -84,7 +84,7 @@ impl<'a> Users<'a> {
     }
 
     /// Create a new user account.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn create(
         &self,
         username: &str,
@@ -113,7 +113,7 @@ impl<'a> Users<'a> {
     }
 
     /// Fetch a user and their password hash, by name. Deliberately not public API.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     async fn by_name_with_password_hash(
         &self,
         username: &str,
@@ -144,7 +144,7 @@ impl<'a> Users<'a> {
 
     /// Authenticate a user by username and password. Only returns Some if the
     /// user exists and the password matches.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn authenticate(
         &self,
         username: &str,
@@ -159,7 +159,7 @@ impl<'a> Users<'a> {
     }
 
     /// Hard-set a user's password. IMPORTANT: assumes you've already validated the inputs!
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn set_password(&self, username: &str, new_password: &str) -> anyhow::Result<()> {
         let password_hash = bcrypt::hash(new_password, 12)?;
         let res = query!(

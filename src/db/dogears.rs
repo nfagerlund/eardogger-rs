@@ -40,7 +40,7 @@ impl<'a> Dogears<'a> {
     }
 
     /// Make a new dogear!
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn create(
         &self,
         user_id: i64,
@@ -82,7 +82,7 @@ impl<'a> Dogears<'a> {
     /// that saves us a bunch of bullshit elsewhere in the system. If you
     /// got your personal dogears into a weird situation, just delete some.
     /// Returns None if no dogears matched.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn update(&self, user_id: i64, current: &str) -> anyhow::Result<Option<Vec<Dogear>>> {
         let matchable = matchable_from_url(current)?;
         let res = query_as!(
@@ -111,7 +111,7 @@ impl<'a> Dogears<'a> {
     /// Given a URL and a user, return the currently bookmarked page on that site.
     /// (or None.) This partially acknowledges the "overlapping prefixes" loophole
     /// by returning the result with the *longest* matching prefix.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn current_for_site(
         &self,
         user_id: i64,
@@ -156,7 +156,7 @@ impl<'a> Dogears<'a> {
     }
 
     /// List some of the user's dogears, with an adjustable page size.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn list(
         &self,
         user_id: i64,
