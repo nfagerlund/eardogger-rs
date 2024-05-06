@@ -21,6 +21,20 @@ pub enum ServeMode {
     Fcgi { max_connections: NonZeroUsize },
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct LogConfig {
+    pub filter: String,
+    pub stdout: bool,
+    pub file: Option<LogFileConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct LogFileConfig {
+    pub directory: PathBuf,
+    pub name: String,
+    pub days: usize,
+}
+
 /// Stuff the app needs that's sourced from configuration.
 #[derive(Clone, Debug)]
 pub struct DogConfig {
@@ -41,6 +55,8 @@ pub struct DogConfig {
     /// Location of the binary key file for signing cookies. We'll auto-create this if it
     /// doesn't exist already.
     pub key_file: PathBuf,
+    /// Settings for application logging via Tracing subscriber layers.
+    pub log: LogConfig,
 }
 
 /// The intermediate struct used for deserializing the config file and
@@ -55,23 +71,32 @@ struct PreDogConfig {
     db_file: String,
     assets_dir: String,
     key_file: String,
+    log: LogConfig,
 }
 
 impl PreDogConfig {
     fn finalize(self, base_dir: &Path) -> anyhow::Result<DogConfig> {
-        // Parse the URL (only fallible bit for now)
-        let public_url = Url::parse(&self.public_url)?;
-        // Join the file paths
-        let db_file = base_dir.join(&self.db_file);
-        let assets_dir = base_dir.join(&self.assets_dir);
-        let key_file = base_dir.join(&self.key_file);
-        // Chomp the rest
+        // Destructure yourself
         let Self {
             production,
             mode,
             validate_migrations,
-            ..
+            public_url,
+            db_file,
+            assets_dir,
+            key_file,
+            mut log,
         } = self;
+
+        // Parse the URL (only fallible bit for now)
+        let public_url = Url::parse(&public_url)?;
+        // Join the file paths
+        let db_file = base_dir.join(db_file);
+        let assets_dir = base_dir.join(assets_dir);
+        let key_file = base_dir.join(key_file);
+        if let Some(logfile) = &mut log.file {
+            logfile.directory = base_dir.join(&logfile.directory);
+        }
         Ok(DogConfig {
             production,
             mode,
@@ -80,6 +105,7 @@ impl PreDogConfig {
             db_file,
             assets_dir,
             key_file,
+            log,
         })
     }
 }
@@ -109,6 +135,11 @@ impl DogConfig {
             db_file: "ignore_me".to_string(),
             assets_dir: "public".to_string(),
             key_file: "cookie_key.bin".to_string(),
+            log: LogConfig {
+                filter: "info".to_string(),
+                stdout: true,
+                file: None,
+            },
         };
         let cwd = std::env::current_dir()?;
         pre.finalize(&cwd)

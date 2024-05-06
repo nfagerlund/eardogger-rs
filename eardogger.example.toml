@@ -5,6 +5,25 @@ db_file = "dev.db"
 assets_dir = "public"
 key_file = "cookie_key.bin"
 
+[log]
+# An EnvFilter string, as described in the tracing-subscriber docs:
+# https://docs.rs/tracing-subscriber/0.3.18/tracing_subscriber/filter/struct.EnvFilter.html
+filter = "info"
+# Whether to log to stdout. In local dev that's your terminal, and in a
+# PaaS it's probably some log collector service. But in mod_fcgid, it
+# goes to Apache's MAIN ErrorLog file (NOT your vhost's ErrorLog),
+# which you almost certainly do not want. So use log.file instead.
+stdout = true
+
+# The whole log.file section is optional. If present, we write rolling
+# daily "<name>.<timestamp>.log" files to <directory>, keeping <days>
+# days worth and deleting any older ones.
+[log.file]
+directory = "logs"
+name = "eardogger"
+days = 5
+
+# Choose ONE group of mode settings, either http or fcgi.
 [mode.http]
 port = 3000
 

@@ -19,6 +19,10 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tower_cookies::Key;
 use tracing::{debug, error, info, info_span};
+use tracing_appender::{
+    non_blocking::WorkerGuard,
+    rolling::{RollingFileAppender, Rotation},
+};
 use tracing_subscriber::{
     fmt::layer as fmt_layer, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
@@ -37,10 +41,42 @@ async fn main() -> anyhow::Result<()> {
         None => DogConfig::load("eardogger.toml")?,
     };
 
-    // Set up tracing. TODO: log file appender from config
+    // Set up tracing
+
+    // A Registry subscriber is a hairball of a type that grows more fuzz
+    // with every layer, so you can't do conditional `.with()`s. But
+    // Option<Layer> implements Layer, so we can unconditionally add layer values
+    // that represent a condition.
+    let stdout_layer = if config.log.stdout {
+        Some(fmt_layer())
+    } else {
+        None
+    };
+
+    // The non-blocking logfile writer relies on a drop-guard to ensure writes get
+    // flushed at the end of main. So we need to make sure we're holding onto it
+    // at top scope, instead of dropping it at the end of a conditional.
+    let mut _log_writer_guard: Option<WorkerGuard> = None;
+    let logrotate_layer = if let Some(logfile) = &config.log.file {
+        let file_appender = RollingFileAppender::builder()
+            .rotation(Rotation::DAILY)
+            .filename_prefix(&logfile.name)
+            .filename_suffix("log")
+            .max_log_files(logfile.days)
+            .build(&logfile.directory)?;
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        // Hand the guard off to the outer scope
+        _log_writer_guard = Some(guard);
+        Some(fmt_layer().with_writer(non_blocking).with_ansi(false))
+    } else {
+        None
+    };
+
+    // Ok, there we go.
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .with(fmt_layer())
+        .with(EnvFilter::new(&config.log.filter))
+        .with(stdout_layer)
+        .with(logrotate_layer)
         .init();
 
     // Set up cancellation and task tracking
