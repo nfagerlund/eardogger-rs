@@ -1,3 +1,13 @@
+//! tl;dr:
+//!
+//! - Add both middlewares to the app, making sure the token one runs after
+//!   the session one. Wholly-static routes with no user variance (/public, 404...)
+//!   can go outside the auth middlewares.
+//! - AuthSession is a subset of AuthAny.
+//! - Most "web page" routes should use the AuthSession extractor to get a user.
+//! - API routes can use the AuthAny extractor, and should immediately call
+//!   `.allowed_scopes()?` on the value.
+
 use super::state::DogState;
 use super::web_result::{ApiError, AppError, AppErrorKind};
 use crate::db::{Session, Token, TokenScope, User};
@@ -115,7 +125,13 @@ fn header_val_matches(val: &HeaderValue, text: &str) -> bool {
 }
 
 // These extractors rely on the session and token middlewares being present in
-// the stack. If they're not around, it always whiffs.
+// the stack. If they're not around, extraction always whiffs.
+//
+// Routes should pick their extractor based on which kinds of auth they allow.
+// Most routes only want a login user and should use AuthSession, but API routes
+// that accept token auth should use AuthAny and then call
+// `auth.allowed_scopes(&[...])?` to validate the token scope before continuing.
+
 #[async_trait]
 impl<S> FromRequestParts<S> for AuthAny
 where
@@ -179,9 +195,9 @@ where
 // as arguments, the last extractor arg MUST consume the body, and the LAST
 // last arg is a Next fn.
 //
-// In my case, the session middleware will be applied to every route, but the
-// token one will only be applied to API routes. The token middleware expects
-// to run AFTER the session one, and will blow away the session user if a token
+// Both these middlewares are applied to almost every route, and routes can
+// use the extractors to pick which kinds of auth they accept. The token fn must
+// run AFTER the session fn, and will blow away the session user if a token
 // was actually provided.
 
 /// Function middleware to validate a login session and make the logged-in user
@@ -222,8 +238,8 @@ pub async fn session_middleware(
 }
 
 /// Function middleware to validate a token passed in the `Authorization: Bearer STUFF`
-/// header and make the token's user available to routes. This should only be applied
-/// to API routes, and it overrides the session user if both would have been present.
+/// header and make the token's user available to routes. This overrides the session
+/// user if both would have been present.
 #[tracing::instrument(skip_all)]
 pub async fn token_middleware(
     State(state): State<DogState>,
