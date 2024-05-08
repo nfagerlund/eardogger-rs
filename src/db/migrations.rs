@@ -69,13 +69,17 @@ impl Display for Status {
                 applied_checksum: have,
                 intended_checksum: want,
             } => {
-                // Actually this checksum formatting is pretty rough.
-                // But the situation is also pretty rough and you'll need
-                // the sqlx cli in a sec anyway, so hey.
-                write!(
-                    f,
-                    "{v} (!!BUSTED!!) {d} - have {have:02x?}, want {want:02x?}"
-                )
+                // Checksum is a sha384 as raw bytes. Format the first 8 bytes as
+                // 16 hex characters for short display.
+                write!(f, "{v} (!!BUSTED!!) {d} - have ")?;
+                for b in &have[0..8] {
+                    write!(f, "{b:02x?}")?;
+                }
+                write!(f, ", want ")?;
+                for b in &want[0..8] {
+                    write!(f, "{b:02x?}")?;
+                }
+                Ok(())
             }
             Status::Pending {
                 version: v,
