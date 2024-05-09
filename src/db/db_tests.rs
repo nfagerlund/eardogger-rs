@@ -71,7 +71,9 @@ async fn cascading_delete() {
 
 #[tokio::test]
 async fn session_lifetime_modifier() {
-    // HARDCODED ASSUMPTION: sessions::SESSION_LIFETIME_MODIFIER is +90 days.
+    // hardcoded assumption:
+    assert_eq!(super::sessions::SESSION_LIFETIME_DAYS, 90);
+
     let db = Db::new_test_db().await;
 
     let session_user = db

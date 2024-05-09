@@ -14,7 +14,7 @@ use crate::config::DogConfig;
 
 // Right, here's the ground rules for tests in this file. We're taking as
 // axiomatic that DB methods like Dogears::destroy work as advertised, bc
-// they're already tested over in db_tests. So we don't bother testing cases
+// they're already type-checked or tested elsewhere. So don't bother w/ cases
 // like wrong user ID. We mostly care about the response formats and status
 // codes here.
 

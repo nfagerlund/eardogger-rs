@@ -192,8 +192,8 @@ pub async fn post_mark(
 /// - If there's an existing dogear, redirect straight to the currently marked page for it.
 /// - If not, render the create page.
 /// - If logged out, show the login page.
-/// Since this might be a Redirect OR a page, we need to return Result on the happy path
-/// and manually convert to it.
+/// Since this might be a Redirect OR a page, we can't return `impl IntoResponse`; gotta
+/// manually convert first and return Response.
 #[tracing::instrument(skip_all)]
 pub async fn resume(
     State(state): State<DogState>,
@@ -469,7 +469,7 @@ pub struct SignupParams {
     new_username: String,
     new_password: String,
     new_password_again: String,
-    // Really this'll always be present (and maybe blank), but downstream
+    // Really email'll always be present (and maybe blank), but downstream
     // recipients expect an Option and will flatmap it to normalize.
     email: Option<String>,
     login_csrf_token: String,
@@ -629,9 +629,6 @@ impl ApiDogearsList {
     }
 }
 
-// Hmm, possibly wanna refactor some of the api handler affordances once this is working right.
-// also, rn the auth extractors reject with WebError, which, maybe not right for api routes.
-// guess I could just maybe_auth em right here. come back to this!
 #[tracing::instrument(skip_all)]
 pub async fn api_list(
     State(state): State<DogState>,

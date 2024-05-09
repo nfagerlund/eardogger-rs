@@ -2,8 +2,7 @@ use std::path::PathBuf;
 // For the time being, I want to keep this as stupidly simple as possible.
 // If it gets out of hand later, I can bring in clap or whatever.
 
-// oh, lol, I already have clap in my cargo.toml. well.... anyway.
-
+/// Command-line options received at run-time.
 pub struct Options {
     /// `--config` lets you specify the path of the config file to use.
     /// It's optional; if omitted, we'll use eardogger.toml in the current

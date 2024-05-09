@@ -107,6 +107,7 @@ impl<'a> Migrations<'a> {
     }
 
     /// Run any pending migrations on the database.
+    #[tracing::instrument(skip_all)]
     pub async fn run(&self) -> Result<(), sqlx::migrate::MigrateError> {
         MIGRATOR.run(self.write_pool()).await
     }
@@ -115,6 +116,7 @@ impl<'a> Migrations<'a> {
     /// on the logic in here, consult the source of the sqlx CLI:
     /// https://github.com/launchbadge/sqlx/blob/5d6c33ed65cc2/sqlx-cli/src/migrate.rs
     /// We're doing a fast and dirty version of the same thing.
+    #[tracing::instrument(skip_all)]
     pub async fn validate(&self) -> anyhow::Result<()> {
         // Using write pool bc there's a small chance of CREATE TABLE.
         // Also this happens before normal operation so we aren't worried about contention.
@@ -162,6 +164,7 @@ impl<'a> Migrations<'a> {
     }
 
     /// Basically a wordier version of .validate(), meant for printing info to the terminal.
+    #[tracing::instrument(skip_all)]
     pub async fn info(&self) -> anyhow::Result<Vec<Status>> {
         // Using write pool bc there's a small chance of CREATE TABLE.
         // Also this happens before normal operation so we aren't worried about contention.

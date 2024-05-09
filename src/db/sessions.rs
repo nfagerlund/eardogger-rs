@@ -9,7 +9,7 @@ use tracing::error;
 /// The max duration a session cookie can idle between logins before
 /// it expires. We use a rolling window, so any logged-in activity
 /// resets the expiry timer.
-const SESSION_LIFETIME_DAYS: i64 = 90;
+pub const SESSION_LIFETIME_DAYS: i64 = 90;
 
 /// A query helper type for operating on [Session]s.
 #[derive(Debug)]
@@ -66,6 +66,7 @@ impl<'a> Sessions<'a> {
     /// cleanup operation that should happen as a background task rather than
     /// blocking a user request... but it should happen fairly often so the
     /// number of sessions to waste at once never gets very large.
+    #[tracing::instrument(skip_all)]
     pub async fn delete_expired(&self) -> anyhow::Result<u64> {
         // y'know, ideally I would like to set a limit for how many
         // records to waste at a time, just to guard against blowouts...
@@ -83,7 +84,7 @@ impl<'a> Sessions<'a> {
     }
 
     /// Make a new user login session
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub async fn create(&self, user_id: i64) -> anyhow::Result<Session> {
         let sessid = uuid_string();
         let csrf_token = uuid_string();
