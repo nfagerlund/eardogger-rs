@@ -23,6 +23,26 @@
   </form>
 </details>
 
+<h2>Change email</h2>
+
+<details>
+  <summary>Click here to change your email.</summary>
+
+  <p>Your current email is <strong>{{common.user.email | unwrap_or("not set")}}</strong>. You can also remove your email by submitting this form with an empty value.</p>
+
+  <form action="/change_email" method="post" id="change_email_form">
+    <label for="new_email">New email address</label>
+    <input type="text" name="new_email" id="change_email_new_email" />
+
+    <label for="password">Password</label>
+    <input type="password" name="password" id="change_email_password" />
+
+    <input type="hidden" name="csrf_token" value="{{common.csrf_token}}" />
+
+    <button type="submit">Change email</button>
+  </form>
+</details>
+
 <h2>Manage access tokens</h2>
 
 <p>This is a list of your access tokens, which are associated with <a href="/install">personal bookmarklets</a>. <button type="button" class="help-reveal" data-help-target="help-account-access-token">(huh?)</button></p>

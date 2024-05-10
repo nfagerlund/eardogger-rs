@@ -4,8 +4,8 @@ use super::templates::*;
 use super::web_result::{ApiError, ApiResult, WebError, WebResult};
 use crate::db::{Dogear, TokenScope};
 use crate::util::{
-    check_new_password, uuid_string, ListMeta, Pagination, COOKIE_LOGIN_CSRF, COOKIE_SESSION,
-    PAGE_DEFAULT_SIZE, SHORT_DATE,
+    check_new_password, clean_optional_form_field, uuid_string, ListMeta, Pagination,
+    COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE, SHORT_DATE,
 };
 
 use axum::extract::Path;
@@ -527,6 +527,45 @@ pub async fn post_signup(
     let session = state.db.sessions().create(user.id).await?;
     cookies.add(session.into_cookie());
     Ok(Redirect::to("/"))
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ChangeEmailParams {
+    password: String,
+    // Always present, but gonna flat-map and pass directly to set_email.
+    new_email: Option<String>,
+    csrf_token: String,
+}
+
+/// The change email form, on the account page.
+#[tracing::instrument(skip_all)]
+pub async fn post_change_email(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Form(params): Form<ChangeEmailParams>,
+) -> WebResult<Redirect> {
+    if params.csrf_token != auth.session.csrf_token {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            r#"The change email form you tried to use was stale, or
+                had been tampered with. Go back to the account page and try
+                changing your email again."#
+                .to_string(),
+        ));
+    }
+    let users = state.db.users();
+    let Some(user) = users
+        .authenticate(&auth.user.username, &params.password)
+        .await?
+    else {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            "Wrong password".to_string(),
+        ));
+    };
+    let new_email = clean_optional_form_field(params.new_email.as_deref());
+    users.set_email(&user.username, new_email).await?;
+    Ok(Redirect::to("/account?changed=email"))
 }
 
 /// Change password form args

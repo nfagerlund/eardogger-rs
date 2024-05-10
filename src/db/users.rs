@@ -182,6 +182,7 @@ impl<'a> Users<'a> {
     /// Set or clear the user's email. BTW, this and set_password take username
     /// instead of ID in order to give better errors, since these errors
     /// will definitely flow all the way up to the frontend.
+    #[tracing::instrument(skip_all)]
     pub async fn set_email(&self, username: &str, email: Option<&str>) -> anyhow::Result<()> {
         let email = clean_optional_form_field(email);
 
