@@ -24,12 +24,14 @@
 //! eyre::Report error type, so he can't just do a blanket impl for
 //! T: Error.
 
+use crate::config::is_production;
 use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     Json,
 };
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 /// An IntoResponse-implementing type that can display error content as either
 /// an HTML error page, or a JSON error object. By using wrapper types that
@@ -53,7 +55,7 @@ pub enum AppErrorKind {
 // use the dynamic json!() object macro.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RawJsonError {
-    pub error: String,
+    pub error: Cow<'static, str>,
 }
 
 impl AppError {
@@ -70,21 +72,33 @@ impl IntoResponse for AppError {
     // Depending on our error kind, return either an error html page or an error json object.
     #[tracing::instrument]
     fn into_response(self) -> Response {
-        match self.kind {
+        let Self {
+            message,
+            status,
+            kind,
+        } = self;
+        // Suppress 500 error details for prod. (Other error codes are fine,
+        // but 500s could be pretty much anything.)
+        let message = if is_production() && status == StatusCode::INTERNAL_SERVER_ERROR {
+            Cow::from(
+                r#"The server had a problem and couldn't recover. This is
+                probably a bug in the site."#,
+            )
+        } else {
+            Cow::from(message)
+        };
+
+        match kind {
             AppErrorKind::Html => {
                 let mut text = String::new();
-                // TODO: Probably would like to suppress detailed errors for prod.
                 text.push_str("<p>");
-                html_escape::encode_safe_to_string(&self.message, &mut text);
+                html_escape::encode_safe_to_string(&message, &mut text);
                 text.push_str("</p>");
 
                 let page = format!(include_str!("../../templates/_error.html"), &text);
-                (self.status, Html(page)).into_response()
+                (status, Html(page)).into_response()
             }
             AppErrorKind::Json => {
-                let Self {
-                    message, status, ..
-                } = self;
                 let body = RawJsonError { error: message };
                 (status, Json(body)).into_response()
             }

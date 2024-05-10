@@ -2,9 +2,21 @@ use serde::Deserialize;
 use std::{
     num::NonZeroUsize,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
 };
 use thiserror::Error;
 use url::Url;
+
+static IS_PRODUCTION: AtomicBool = AtomicBool::new(false);
+
+/// Whether the app is running in production or not. This is mostly relevant
+/// when deciding whether to expose the details of a 500 error. Unfortunately,
+/// the spot where we need to _know_ it doesn't have access to a DogConfig,
+/// so we stash the value in a global var when loading the config (which only
+/// happens once) and let you read it from here.
+pub fn is_production() -> bool {
+    IS_PRODUCTION.load(Ordering::Relaxed)
+}
 
 #[derive(Error, Debug)]
 pub enum ConfError {
@@ -48,8 +60,7 @@ pub struct LogFileConfig {
 /// Stuff the app needs that's sourced from configuration.
 #[derive(Clone, Debug)]
 pub struct DogConfig {
-    /// Whether we're running in production or not. Currently not really consulted
-    /// for anything.
+    /// Whether we're running in production or not. Masks 500 error details when true.
     pub production: bool,
     /// Whether to serve in FastCGI or HTTP mode, with mode-specific settings embedded.
     pub mode: ServeMode,
@@ -98,6 +109,8 @@ impl PreDogConfig {
             mut log,
         } = self;
 
+        // Publish IS_PRODUCTION
+        IS_PRODUCTION.store(production, Ordering::Relaxed);
         // Parse the URL (only fallible bit for now)
         let public_url = Url::parse(&public_url)?;
         // Join the file paths

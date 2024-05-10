@@ -10,8 +10,7 @@
 # All of the file/directory settings can be either relative or absolute paths.
 # Relative paths are resolved relative to the config file's location.
 
-# Whether we're running in production or not. Currently not really consulted
-# for anything, but later it might affect verbosity of web errors.
+# Whether we're running in production or not. Affects verbosity of 500 errors.
 production = false
 
 # Whether to check the integrity of database migrations on every startup.
