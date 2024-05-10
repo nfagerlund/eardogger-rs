@@ -30,6 +30,8 @@ use tracing_subscriber::{
 use crate::app::{eardogger_app, load_templates, state::*};
 use crate::config::*;
 
+const MAX_DB_READER_THREADS: u32 = 20;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Get args
@@ -87,8 +89,8 @@ async fn main() -> anyhow::Result<()> {
     debug!("using db file at {:?}", &config.db_file);
     let cores = std::thread::available_parallelism()?.get() as u32;
     // This is a low-traffic service running on shared hardware, so go easy on parallelism.
-    // Up to (cores - 2) threads, with a minimum of 2.
-    let max_readers = cores.saturating_sub(2).max(2);
+    // Up to (cores - 2) threads, with a minimum of 2 and a cap at something silly.
+    let max_readers = cores.saturating_sub(2).max(2).min(MAX_DB_READER_THREADS);
     debug!(
         "{} cores available, limiting db reader threads to {}",
         cores, max_readers
