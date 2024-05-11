@@ -5,7 +5,7 @@
 <h2>Change password</h2>
 
 <details>
-  <summary>Click here to change your password.</summary>
+  <summary>Show the change password form</summary>
 
   <form action="/changepassword" method="post" id="changepasswordform">
     <label for="password">Current password</label>
@@ -26,7 +26,7 @@
 <h2>Change email</h2>
 
 <details>
-  <summary>Click here to change your email.</summary>
+  <summary>Show the change email form</summary>
 
   <p>Your current email is <strong>{{common.user.email | unwrap_or("not set")}}</strong>. You can also remove your email by submitting this form with an empty value.</p>
 
@@ -34,7 +34,7 @@
     <label for="new_email">New email address</label>
     <input type="text" name="new_email" id="change_email_new_email" />
 
-    <label for="password">Password</label>
+    <label for="change_email_password">Password</label>
     <input type="password" name="password" id="change_email_password" />
 
     <input type="hidden" name="csrf_token" value="{{common.csrf_token}}" />
