@@ -43,6 +43,36 @@
   </form>
 </details>
 
+<h2>Delete account</h2>
+
+<details>
+  <summary>Show the delete account form</summary>
+
+  <p>
+    You can use this form to permanently delete your account. This also deletes all
+    of your bookmarks. There is no undo. Once your account is deleted, anyone
+    (including a future version of yourself) can make a new account using your old username.
+  </p>
+
+  <p>
+    In order to delete, you must type the exact phrase <strong>"delete my account"</strong>
+    (without the quotation marks) in the text field. Not trying to trick you or anything,
+    I just don't want it to be possible to do this by accident.
+  </p>
+
+  <form action="/delete_account" method="post" id="delete_account_form">
+    <label for="confirm_delete_account">Type "delete my account" here</label>
+    <input type="text" name="confirm_delete_account" id="confirm_delete_account" />
+
+    <label for="delete_account_password">Password</label>
+    <input type="password" name="password" id="delete_account_password" />
+
+    <input type="hidden" name="csrf_token" value="{{common.csrf_token}}" />
+
+    <button type="submit">DELETE ACCOUNT</button>
+  </form>
+</details>
+
 <h2>Manage access tokens</h2>
 
 <p>This is a list of your access tokens, which are associated with <a href="/install">personal bookmarklets</a>. <button type="button" class="help-reveal" data-help-target="help-account-access-token">(huh?)</button></p>

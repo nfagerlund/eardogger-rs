@@ -204,6 +204,7 @@ impl<'a> Users<'a> {
     }
 
     /// Returns Ok(Some) on success, Ok(None) on not-found.
+    #[tracing::instrument(skip_all)]
     pub async fn destroy(&self, id: i64) -> anyhow::Result<Option<()>> {
         let res = query!(
             r#"

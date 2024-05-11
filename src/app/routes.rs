@@ -395,6 +395,67 @@ pub struct LogoutParams {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct DeleteAccountParams {
+    password: String,
+    confirm_delete_account: String,
+    csrf_token: String,
+}
+
+const DELETE_ACCOUNT_CONFIRM_STRING: &str = "delete my account";
+
+/// The delete account form, on the account page. It's kind of like the Final Logout.
+#[tracing::instrument(skip_all)]
+pub async fn post_delete_account(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    cookies: Cookies,
+    Form(params): Form<DeleteAccountParams>,
+) -> WebResult<Redirect> {
+    if params.csrf_token != auth.session.csrf_token {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            r#"The delete account form you tried to use was stale, or
+                had been tampered with. Go back to the account page and try
+                deleting your account again."#
+                .to_string(),
+        ));
+    }
+    let users = state.db.users();
+    // authenticate the password, validate the confirm string, waste the
+    // session cookie, delete the user (which will cascade to all foreign key refs).
+    let Some(user) = users
+        .authenticate(&auth.user.username, &params.password)
+        .await?
+    else {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            "Wrong password".to_string(),
+        ));
+    };
+    if params.confirm_delete_account.trim() != DELETE_ACCOUNT_CONFIRM_STRING {
+        return Err(WebError::new(
+            StatusCode::BAD_REQUEST,
+            format!(
+                r#"Wrong delete confirmation string; you must type the exact phrase
+                "delete my account" (without the quotation marks) into the account delete
+                form, but you typed "{}" instead. Go back to the account page and try
+                deleting your account again."#,
+                &params.confirm_delete_account
+            ),
+        ));
+    }
+    // OK, at this point we're ready to party.
+    // The From impl on WebError uses ToString, so throwing a str is fine.
+    users
+        .destroy(user.id)
+        .await?
+        .ok_or("User not found! That shouldn't be possible at this point??")?;
+    cookies.remove(auth.session.as_ref().clone().into_cookie());
+
+    Ok(Redirect::to("/"))
+}
+
+#[derive(Deserialize, Debug)]
 pub struct LoginParams {
     pub username: String,
     pub password: String,
