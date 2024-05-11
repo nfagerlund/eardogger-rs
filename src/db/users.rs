@@ -133,8 +133,9 @@ impl<'a> Users<'a> {
         .map_err(|e| e.into())
     }
 
-    /// Just fetch a user. Most app logic should use [`Users::authenticate`] instead,
-    /// but this is nice to have in tests.
+    /// Test helper: Just fetch a user. App logic should always find users
+    /// via the `authenticate` methods on Users / Sessions / Tokens.
+    #[cfg(test)]
     pub async fn by_name(&self, username: &str) -> anyhow::Result<Option<User>> {
         Ok(self
             .by_name_with_password_hash(username)
