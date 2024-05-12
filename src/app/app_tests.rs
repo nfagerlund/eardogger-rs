@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use axum::body::{to_bytes, Body};
-use http::{header, Request, Response, StatusCode};
+use http::{header, request::Builder, Request, Response, StatusCode};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
@@ -33,6 +33,11 @@ async fn test_state() -> DogState {
     Arc::new(inner)
 }
 
+// Being lazy.
+fn new_req(method: impl AsRef<str>, uri: impl AsRef<str>) -> Builder {
+    Request::builder().method(method.as_ref()).uri(uri.as_ref())
+}
+
 // Since https://github.com/tokio-rs/axum/pull/1751, axum routers can't handle
 // type inferrence for the ServiceExt methods because they're no longer generic
 // over the body type. So you have to use the uniform function call syntax, which
@@ -47,6 +52,31 @@ async fn do_req(app: &mut axum::Router, req: Request<Body>) -> Response<Body> {
         .unwrap()
 }
 
+/// A few little extension methods for request::Builder.
+trait TestRequestBuilder {
+    /// Adds bearer auth w/ the provided token cleartext.
+    fn token(self, token: &str) -> Self;
+    /// Adds session auth cookie w/ the provided session ID.
+    fn session(self, session: &str) -> Self;
+    /// Sets accept + content-type json.
+    fn json(self) -> Self;
+}
+
+impl TestRequestBuilder for Builder {
+    fn token(self, token: &str) -> Self {
+        self.header(header::AUTHORIZATION, format!("Bearer {}", token))
+    }
+    fn session(self, sessid: &str) -> Self {
+        self.header(header::COOKIE, format!("eardogger.sessid={}", sessid))
+    }
+    fn json(self) -> Self {
+        self.header(header::ACCEPT, "application/json")
+            .header(header::CONTENT_TYPE, "application/json")
+    }
+}
+
+/// Returns true if the response excludes the Access-Control-Allow-Methods
+/// header (which browsers require in order to permit a CORS request).
 fn no_cors(resp: &Response<Body>) -> bool {
     !resp
         .headers()
@@ -65,20 +95,28 @@ async fn api_insufficient_permissions(resp: Response<Body>) -> bool {
     }
 }
 
-/// Returns true if the response is a 401 (no token or login session provided).
-/// This one consumes the response body, so it needs ownership and async.
-async fn api_unauthenticated(resp: Response<Body>) -> bool {
+/// Does an API request without providing any auth, and panics unless the response
+/// is the expected 401 code and json error object.
+async fn assert_api_auth_required(
+    app: &mut Router,
+    method: &'static str,
+    uri: impl AsRef<str>,
+    body: Option<Body>,
+) {
+    let body = body.unwrap_or(Body::empty());
+    let req = Request::builder()
+        .uri(uri.as_ref())
+        .method(method)
+        .json()
+        .body(body)
+        .unwrap();
+    let resp = do_req(app, req).await;
     let status = resp.status();
     let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    if let Ok(err) = serde_json::from_slice::<RawJsonError>(&body_bytes) {
-        status == StatusCode::UNAUTHORIZED && err.error.contains("aren't")
-    } else {
-        false // couldn't deserialize
-    }
-}
-
-fn session_cookie(sessid: &str) -> String {
-    format!("eardogger.sessid={}", sessid)
+    let err =
+        serde_json::from_slice::<RawJsonError>(&body_bytes).expect("couldn't deserialize err body");
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(err.error.contains("aren't"));
 }
 
 #[tokio::test]
@@ -93,10 +131,8 @@ async fn api_list_test() {
     // 1. No cors allowed.
     {
         // OPTIONS
-        let req = Request::builder()
-            .uri("/api/v1/list")
-            .method("OPTIONS")
-            .header(header::ACCEPT, "application/json")
+        let req = new_req("OPTIONS", "/api/v1/list")
+            .json()
             .header(header::ORIGIN, "https://example.com")
             .body(Body::empty())
             .unwrap();
@@ -104,15 +140,10 @@ async fn api_list_test() {
         assert!(no_cors(&resp));
 
         // plain GET
-        let req = Request::builder()
-            .uri("/api/v1/list")
-            .method("GET")
-            .header(header::ACCEPT, "application/json")
+        let req = new_req("GET", "/api/v1/list")
+            .json()
             .header(header::ORIGIN, "https://example.com")
-            .header(
-                header::COOKIE,
-                format!("eardogger.sessid={}", &user.session_id),
-            )
+            .session(&user.session_id)
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
@@ -120,22 +151,13 @@ async fn api_list_test() {
     }
     // 2. Logged out: 401.
     {
-        let req = Request::builder()
-            .uri("/api/v1/list")
-            .method("GET")
-            .header(header::ACCEPT, "application/json")
-            .body(Body::empty())
-            .unwrap();
-        let resp = do_req(&mut app, req).await;
-        assert!(api_unauthenticated(resp).await);
+        assert_api_auth_required(&mut app, "GET", "/api/v1/list", None).await;
     }
     // 3. Logged in: it lists your dogears.
     {
-        let req = Request::builder()
-            .uri("/api/v1/list")
-            .method("GET")
-            .header(header::ACCEPT, "application/json")
-            .header(header::COOKIE, session_cookie(&user.session_id))
+        let req = new_req("GET", "/api/v1/list")
+            .json()
+            .session(&user.session_id)
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
@@ -149,14 +171,9 @@ async fn api_list_test() {
     }
     // 4. Token auth: it lists your dogears.
     {
-        let req = Request::builder()
-            .uri("/api/v1/list")
-            .method("GET")
-            .header(header::ACCEPT, "application/json")
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", &user.manage_token),
-            )
+        let req = new_req("GET", "/api/v1/list")
+            .json()
+            .token(&user.manage_token)
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
@@ -170,14 +187,9 @@ async fn api_list_test() {
     }
     // 5. Insufficient scope (we need manage or higher): It bails
     {
-        let req = Request::builder()
-            .uri("/api/v1/list")
-            .method("GET")
-            .header(header::ACCEPT, "application/json")
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", &user.write_token),
-            )
+        let req = new_req("GET", "/api/v1/list")
+            .json()
+            .token(&user.write_token)
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
@@ -206,10 +218,8 @@ async fn api_delete_test() {
 
     // 1. No cors preflight approval
     {
-        let req = Request::builder()
-            .uri(&delete_0)
-            .method("OPTIONS")
-            .header(header::ACCEPT, "application/json")
+        let req = new_req("OPTIONS", &delete_0)
+            .json()
             .header(header::ORIGIN, "https://example.com")
             .body(Body::empty())
             .unwrap();
@@ -218,22 +228,13 @@ async fn api_delete_test() {
     }
     // 2. 401 when logged out
     {
-        let req = Request::builder()
-            .uri("/api/v1/dogear/20566")
-            .method("DELETE")
-            .header(header::ACCEPT, "application/json")
-            .body(Body::empty())
-            .unwrap();
-        let resp = do_req(&mut app, req).await;
-        assert!(api_unauthenticated(resp).await);
+        assert_api_auth_required(&mut app, "DELETE", "/api/v1/dogear/20566", None).await;
     }
     // 3. 204 on hit
     {
-        let req = Request::builder()
-            .uri(&delete_0)
-            .method("DELETE")
-            .header(header::ACCEPT, "application/json")
-            .header(header::COOKIE, session_cookie(&user.session_id))
+        let req = new_req("DELETE", &delete_0)
+            .json()
+            .session(&user.session_id)
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
@@ -241,11 +242,9 @@ async fn api_delete_test() {
     }
     // 4. 404 on whiff
     {
-        let req = Request::builder()
-            .uri(&delete_0) // Second time using this URL, so it's dead
-            .method("DELETE")
-            .header(header::ACCEPT, "application/json")
-            .header(header::COOKIE, session_cookie(&user.session_id))
+        let req = new_req("DELETE", &delete_0) // Second time using this URL, so it's dead
+            .json()
+            .session(&user.session_id)
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
@@ -253,14 +252,10 @@ async fn api_delete_test() {
     }
     // 5. Tokens: Requires manage scope
     {
-        let req = Request::builder()
-            .uri(&delete_1)
+        let req = new_req("DELETE", &delete_1)
             .method("DELETE")
-            .header(header::ACCEPT, "application/json")
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", &user.write_token),
-            )
+            .json()
+            .token(&user.write_token)
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
@@ -268,14 +263,9 @@ async fn api_delete_test() {
     }
     // ...second verse, same as the first, this time it works.
     {
-        let req = Request::builder()
-            .uri(&delete_1)
-            .method("DELETE")
-            .header(header::ACCEPT, "application/json")
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", &user.manage_token),
-            )
+        let req = new_req("DELETE", &delete_1)
+            .json()
+            .token(&user.manage_token)
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
