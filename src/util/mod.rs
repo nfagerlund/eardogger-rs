@@ -1,7 +1,7 @@
 mod bookmarklets;
+mod error;
 mod url_encoding;
 
-use anyhow::anyhow;
 use rand::{thread_rng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -10,6 +10,7 @@ use time::{format_description::FormatItem, macros::format_description};
 use url::Url;
 
 pub use bookmarklets::*;
+pub use error::*;
 
 // Constants
 /// A time crate format description, like this: 2024-3-22
@@ -108,20 +109,20 @@ pub struct Pagination {
 /// Given a (1-indexed) page and size, calculate an OFFSET value to pass
 /// to a sqlite query. Sqlite integers in sqlx are pretty much always i64,
 /// so this is messier than it feels like it wants to be.
-pub fn sqlite_offset(page: u32, size: u32) -> anyhow::Result<i64> {
-    let zero_idx_page = page
-        .checked_sub(1)
-        .ok_or_else(|| anyhow!("Invalid page number."))?;
+pub fn sqlite_offset(page: u32, size: u32) -> Result<i64, UserError> {
+    let zero_idx_page = page.saturating_sub(1);
     if size > PAGE_MAX_SIZE {
-        return Err(anyhow!("Requested page size is too large."));
+        return Err(UserError::PageOversize);
     }
     let size_i64: i64 = size.into();
     let zero_idx_page_i64: i64 = zero_idx_page.into();
 
     // This also can't fail, with MAX_PAGE_SIZE set to 500.
-    size_i64.checked_mul(zero_idx_page_i64).ok_or_else(|| {
-        anyhow!("Literally impossible, but apparently page * size overflowed an i64.")
-    })
+    size_i64
+        .checked_mul(zero_idx_page_i64)
+        .ok_or(UserError::Impossible(
+            "page * size couldn't have overflowed an i64 here.",
+        ))
 }
 
 #[derive(Error, Debug)]
@@ -176,9 +177,11 @@ fn trim_m_www(mut partial_url: &str) -> &str {
 
 /// Validate that the input is an HTTP or HTTPS URL, then remove the scheme and
 /// the `://` separator. The result can be passed to [`trim_m_www`].
-fn trim_and_check_scheme(url: &str) -> anyhow::Result<&str> {
+fn trim_and_check_scheme(url: &str) -> Result<&str, UserError> {
     let Ok(parsed) = Url::parse(url) else {
-        return Err(anyhow!("Can't bookmark an invalid URL: {}", url));
+        return Err(UserError::DogearInvalidUrl {
+            url: url.to_string(),
+        });
     };
     let scheme = parsed.scheme();
     if scheme == "http" || scheme == "https" {
@@ -186,10 +189,9 @@ fn trim_and_check_scheme(url: &str) -> anyhow::Result<&str> {
         let sliced = &url[trim_len..];
         Ok(sliced)
     } else {
-        Err(anyhow!(
-            "Only http or https URLs are supported; we can't bookmark {}",
-            scheme
-        ))
+        Err(UserError::DogearInvalidUrl {
+            url: url.to_string(),
+        })
     }
 }
 
@@ -198,7 +200,7 @@ fn trim_and_check_scheme(url: &str) -> anyhow::Result<&str> {
 /// stored prefix string with a simple `matchable LIKE prefix || '%'`
 /// SQL expression (or a `.starts_with()` if you're in normal code).
 /// This also doubles as a check for valid input URLs.
-pub fn matchable_from_url(url: &str) -> anyhow::Result<&str> {
+pub fn matchable_from_url(url: &str) -> Result<&str, UserError> {
     Ok(trim_m_www(trim_and_check_scheme(url)?))
 }
 

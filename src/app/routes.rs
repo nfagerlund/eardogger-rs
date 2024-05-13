@@ -4,7 +4,7 @@ use super::templates::*;
 use super::web_result::{ApiError, ApiResult, WebError, WebResult};
 use crate::db::{Dogear, TokenScope};
 use crate::util::{
-    check_new_password, clean_optional_form_field, uuid_string, ListMeta, Pagination,
+    check_new_password, clean_optional_form_field, uuid_string, ListMeta, Pagination, UserError,
     COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE, SHORT_DATE,
 };
 
@@ -263,8 +263,11 @@ pub async fn post_fragment_personalmark(
     }
     // Skip an alloc w/ format_into:
     let mut comment_bytes: Vec<u8> = "Personal bookmarklet created ".into();
-    OffsetDateTime::now_utc().format_into(&mut comment_bytes, SHORT_DATE)?;
-    let comment = String::from_utf8(comment_bytes)?;
+    OffsetDateTime::now_utc()
+        .format_into(&mut comment_bytes, SHORT_DATE)
+        .map_err(|_| UserError::Impossible("time format_into vec failed"))?;
+    let comment = String::from_utf8(comment_bytes)
+        .map_err(|_| UserError::Impossible("statically known utf8 wasn't utf8"))?;
     // New token:
     let (_, token_cleartext) = state
         .db
@@ -446,10 +449,9 @@ pub async fn post_delete_account(
     }
     // OK, at this point we're ready to party.
     // The From impl on WebError uses ToString, so throwing a str is fine.
-    users
-        .destroy(user.id)
-        .await?
-        .ok_or("User not found! That shouldn't be possible at this point??")?;
+    users.destroy(user.id).await?.ok_or(UserError::Impossible(
+        "User not found! That shouldn't be possible at this point??",
+    ))?;
     cookies.remove(auth.session.as_ref().clone().into_cookie());
 
     Ok(Redirect::to("/"))
@@ -801,20 +803,28 @@ pub async fn api_create(
 // origin. This is hardcoded for the needs of the /api/v1/update endpoint,
 // because it's literally the only thing we do that needs cors, so it's not
 // worth investing in tower-http's CorsLayer yet.
-fn set_cors_headers_for_api_update(
-    headers: &mut HeaderMap,
-    origin: &str,
-) -> Result<(), <HeaderValue as std::str::FromStr>::Err> {
-    headers.insert(header::VARY, "Origin".parse()?);
+fn set_cors_headers_for_api_update(headers: &mut HeaderMap, origin: &str) -> Result<(), UserError> {
+    headers.insert(header::VARY, HeaderValue::from_name(header::ORIGIN));
     // First off, we no longer do cookie auth on CORS, it's tokens or the highway. So:
-    headers.insert(header::ACCESS_CONTROL_ALLOW_CREDENTIALS, "false".parse()?);
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+        HeaderValue::from_static("false"),
+    );
     // Whoever you are: u are valid. (Actually, I think we could get away
-    // with *, now that we're not accepting credentials. Nevertheless,)
-    headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin.parse()?);
-    headers.insert(header::ACCESS_CONTROL_ALLOW_METHODS, "POST".parse()?);
+    // with *, now that we're not accepting credentials. Nevertheless!)
+    // Don't mind the map_err; this basically can't happen if the http::Request
+    // made it this far.
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        origin.parse().map_err(|_| UserError::HttpFucked)?,
+    );
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_METHODS,
+        HeaderValue::from_static("POST"),
+    );
     headers.insert(
         header::ACCESS_CONTROL_ALLOW_HEADERS,
-        "Content-Type, Authorization, Content-Length, X-Requested-With".parse()?,
+        HeaderValue::from_static("Content-Type, Authorization, Content-Length, X-Requested-With"),
     );
     Ok(())
 }
@@ -865,12 +875,14 @@ pub async fn api_update(
 
                 // OK, first, CORS ACCESS CHECK.
                 // Requests from other sites may only update your bookmark on THAT site.
-                let to_bookmark = Url::parse(&payload.current)?;
+                let Ok(to_bookmark) = Url::parse(&payload.current) else {
+                    return Err(UserError::DogearInvalidUrl {
+                        url: payload.current,
+                    }
+                    .into());
+                };
                 if to_bookmark.origin().ascii_serialization() != origin {
-                    return Err(ApiError::new(
-                        StatusCode::NOT_FOUND,
-                        "dogear not found".to_string(),
-                    ));
+                    return Err(UserError::Dogear404.into());
                 }
 
                 // Ok, looks like we're good to go. Tack on them headers.
@@ -886,9 +898,6 @@ pub async fn api_update(
         .await?
     {
         Some(ds) => Ok((res_headers, Json(ds))),
-        None => Err(ApiError::new(
-            StatusCode::NOT_FOUND,
-            "dogear not found".to_string(),
-        )),
+        None => Err(UserError::Dogear404.into()),
     }
 }
