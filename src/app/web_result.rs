@@ -168,19 +168,3 @@ impl IntoResponse for ApiError {
         self.0.into_response()
     }
 }
-
-// Blanket impl for turning an anyhow into a 500 error.
-impl IntoHandlerError for anyhow::Error {
-    fn status_and_message(self) -> (http::StatusCode, String) {
-        // For quick-and-dirty error returns, use a default HTTP error code of 500.
-        // This is almost always correct.
-        (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
-    }
-}
-
-// Template errors are also 500s.
-impl IntoHandlerError for minijinja::Error {
-    fn status_and_message(self) -> (StatusCode, String) {
-        (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
-    }
-}

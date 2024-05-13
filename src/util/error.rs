@@ -52,3 +52,69 @@ impl IntoHandlerError for UserError {
         (status, self.to_string())
     }
 }
+
+// Blanket impl for turning an anyhow into a 500 error.
+impl IntoHandlerError for anyhow::Error {
+    fn status_and_message(self) -> (http::StatusCode, String) {
+        // For quick-and-dirty error returns, use a default HTTP error code of 500.
+        // This is almost always correct.
+        (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
+    }
+}
+
+// Template errors are also 500s.
+impl IntoHandlerError for minijinja::Error {
+    fn status_and_message(self) -> (StatusCode, String) {
+        (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
+    }
+}
+
+// Db errors are 500s unless we're using a mixed result to turn
+// some of them into 4xxs instead (like with unique conflicts).
+impl IntoHandlerError for sqlx::Error {
+    fn status_and_message(self) -> (StatusCode, String) {
+        (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
+    }
+}
+
+/// Helper enum for when a given function might return errors from
+/// two separate domains (server errors that should be masked, and user
+/// errors that should be elaborated).
+#[derive(Debug, Error)]
+pub enum MixedError<T>
+where
+    T: IntoHandlerError,
+{
+    #[error("{0}")]
+    User(UserError),
+    #[error("{0}")]
+    Server(T),
+}
+
+impl<T> IntoHandlerError for MixedError<T>
+where
+    T: IntoHandlerError,
+{
+    fn status_and_message(self) -> (StatusCode, String) {
+        match self {
+            MixedError::User(e) => e.status_and_message(),
+            MixedError::Server(e) => e.status_and_message(),
+        }
+    }
+}
+
+impl<T> From<UserError> for MixedError<T>
+where
+    T: IntoHandlerError,
+{
+    fn from(value: UserError) -> Self {
+        Self::User(value)
+    }
+}
+// Alas, we cannot blanket impl, for the same reason you can't have
+// a blanket impl for T: Error overlapping with type-specific impls.
+impl From<sqlx::Error> for MixedError<sqlx::Error> {
+    fn from(value: sqlx::Error) -> Self {
+        Self::Server(value)
+    }
+}

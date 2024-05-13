@@ -1,12 +1,11 @@
 use super::core::Db;
 use crate::util::{
     clean_optional_form_field, matchable_from_url, normalize_prefix_matcher, sqlite_offset,
-    ListMeta,
+    ListMeta, MixedError, UserError,
 };
 
-use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, query_scalar, SqlitePool};
+use sqlx::{error::ErrorKind, query, query_as, query_scalar, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
 
 /// A query helper type for operating on [Dogears]. Usually rented from a [Db].
@@ -47,14 +46,16 @@ impl<'a> Dogears<'a> {
         prefix: &str,
         current: &str,
         display_name: Option<&str>,
-    ) -> anyhow::Result<Dogear> {
+    ) -> Result<Dogear, MixedError<sqlx::Error>> {
         let normalized_prefix = normalize_prefix_matcher(prefix);
         // Confirm that the current URL is valid and matches the prefix
         let matchable_current = matchable_from_url(current)?;
         if !matchable_current.starts_with(normalized_prefix) {
-            return Err(anyhow!(
-                "The provided URL doesn't match the provided prefix."
-            ));
+            return Err(UserError::DogearNonMatching {
+                url: current.to_string(),
+                prefix: prefix.to_string(),
+            }
+            .into());
         }
         let normalized_display_name = clean_optional_form_field(display_name);
 
@@ -72,7 +73,19 @@ impl<'a> Dogears<'a> {
         )
         .fetch_one(self.write_pool())
         .await
-        .map_err(|e| e.into())
+        .map_err(|e| {
+            // Need to catch unique constraint violation and return friendly error; any
+            // other sqlx errors are 500s in this case.
+            match e {
+                sqlx::Error::Database(dbe) if dbe.kind() == ErrorKind::UniqueViolation => {
+                    UserError::DogearExists {
+                        prefix: normalized_prefix.to_string(),
+                    }
+                    .into()
+                }
+                _ => e.into(),
+            }
+        })
     }
 
     /// Given a user and a current URL, update the corresponding dogear to
@@ -83,8 +96,13 @@ impl<'a> Dogears<'a> {
     /// got your personal dogears into a weird situation, just delete some.
     /// Returns None if no dogears matched.
     #[tracing::instrument(skip_all)]
-    pub async fn update(&self, user_id: i64, current: &str) -> anyhow::Result<Option<Vec<Dogear>>> {
-        let matchable = matchable_from_url(current)?;
+    pub async fn update(&self, user_id: i64, current: &str) -> sqlx::Result<Option<Vec<Dogear>>> {
+        // If the URL is bad, we just return None. This is because a failed update
+        // usually diverts you onto the more verbose create flow, which has better
+        // affordances available for telling you about the problem.
+        let Ok(matchable) = matchable_from_url(current) else {
+            return Ok(None);
+        };
         let res = query_as!(
             Dogear,
             r#"
@@ -112,12 +130,11 @@ impl<'a> Dogears<'a> {
     /// (or None.) This partially acknowledges the "overlapping prefixes" loophole
     /// by returning the result with the *longest* matching prefix.
     #[tracing::instrument(skip_all)]
-    pub async fn current_for_site(
-        &self,
-        user_id: i64,
-        url: &str,
-    ) -> anyhow::Result<Option<String>> {
-        let matchable = matchable_from_url(url)?;
+    pub async fn current_for_site(&self, user_id: i64, url: &str) -> sqlx::Result<Option<String>> {
+        // If the URL is bad, just return None. We tried!
+        let Ok(matchable) = matchable_from_url(url) else {
+            return Ok(None);
+        };
         let res = query!(
             r#"
                 SELECT current
@@ -137,7 +154,7 @@ impl<'a> Dogears<'a> {
     }
 
     /// yeah. Returns Ok(Some) on success, Ok(None) on not-found.
-    pub async fn destroy(&self, id: i64, user_id: i64) -> anyhow::Result<Option<()>> {
+    pub async fn destroy(&self, id: i64, user_id: i64) -> sqlx::Result<Option<()>> {
         let res = query!(
             r#"
                 DELETE FROM dogears
@@ -162,7 +179,7 @@ impl<'a> Dogears<'a> {
         user_id: i64,
         page: u32,
         size: u32,
-    ) -> anyhow::Result<(Vec<Dogear>, ListMeta)> {
+    ) -> Result<(Vec<Dogear>, ListMeta), MixedError<sqlx::Error>> {
         // Do multiple reads in a transaction, so count and list see the
         // same causal slice.
         let mut tx = self.read_pool().begin().await?;
