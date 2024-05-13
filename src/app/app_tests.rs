@@ -52,12 +52,19 @@ async fn do_req(app: &mut axum::Router, req: Request<Body>) -> Response<Body> {
         .unwrap()
 }
 
+enum Auth<'a> {
+    Token(&'a str),
+    Session(&'a str),
+}
+
 /// A few little extension methods for request::Builder.
 trait TestRequestBuilder {
     /// Adds bearer auth w/ the provided token cleartext.
     fn token(self, token: &str) -> Self;
     /// Adds session auth cookie w/ the provided session ID.
     fn session(self, session: &str) -> Self;
+    /// Convenience wrapper for reusable test cases: takes either token or session.
+    fn auth(self, auth: Auth) -> Self;
     /// Sets accept + content-type json.
     fn json(self) -> Self;
 }
@@ -68,6 +75,12 @@ impl TestRequestBuilder for Builder {
     }
     fn session(self, sessid: &str) -> Self {
         self.header(header::COOKIE, format!("eardogger.sessid={}", sessid))
+    }
+    fn auth(self, auth: Auth) -> Self {
+        match auth {
+            Auth::Token(t) => self.token(t),
+            Auth::Session(s) => self.session(s),
+        }
     }
     fn json(self) -> Self {
         self.header(header::ACCEPT, "application/json")
@@ -269,5 +282,94 @@ async fn api_delete_test() {
             .unwrap();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    }
+}
+
+#[tokio::test]
+async fn api_create_test() {
+    use crate::db::Dogear;
+
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+
+    let user = state.db.test_user("whoever").await.unwrap();
+    let uri = "/api/v1/create";
+
+    // 1. No cors preflight approval.
+    {
+        let body = r#"{
+            "prefix": "example.com/cors",
+            "current": "http://example.com/cors/0"
+        }"#;
+        let req = new_req("OPTIONS", uri)
+            .json()
+            .header(header::ORIGIN, "https://example.com")
+            .body(body.into())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_no_cors(&resp);
+    }
+    // 2. 401 when not authenticated
+    {
+        let body = r#"{
+            "prefix": "example.com/cors",
+            "current": "http://example.com/cors/0"
+        }"#;
+        assert_api_auth_required(&mut app, "POST", uri, Some(body.into())).await;
+    }
+    // 3. Happy path: 201 and a dogear
+    // (changed from ed.v1, which returned a 1-item array)
+    {
+        // reusable test case; returns a dogear for further inspection. if u even care.
+        let happy_path = |auth: Auth, body: &'static str| {
+            let req = new_req("POST", uri)
+                .json()
+                .auth(auth)
+                .body(body.into())
+                .unwrap();
+            // async closures are unstable... and also I can't retain a &mut to that app
+            // after I've returned a future. So, clone.
+            let mut app = app.clone();
+            async move {
+                let resp = do_req(&mut app, req).await;
+                assert_eq!(resp.status(), StatusCode::CREATED);
+                let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+                // Got back a dogear
+                let d: Dogear =
+                    serde_json::from_slice(&body_bytes).expect("couldn't deserialize Dogear");
+                // Didn't get back an error object
+                let e = serde_json::from_slice::<RawJsonError>(&body_bytes);
+                assert!(e.is_err());
+                d
+            }
+        };
+        // 3.1: logged in
+        {
+            let body = r#"{
+                "prefix": "example.com/login",
+                "current": "http://example.com/login/1"
+            }"#;
+            let d = happy_path(Auth::Session(&user.session_id), body).await;
+            assert_eq!(d.display_name, None);
+        }
+        // 3.2: write token is ok
+        {
+            let body = r#"{
+                "prefix": "example.com/write",
+                "current": "http://example.com/write/5",
+                "display_name": "write token"
+            }"#;
+            let d = happy_path(Auth::Token(&user.write_token), body).await;
+            assert_eq!(d.display_name.as_deref(), Some("write token"));
+        }
+        // 3.3: manage token is ok
+        {
+            let body = r#"{
+                "prefix": "example.com/manage",
+                "current": "http://example.com/manage/91",
+                "display_name": "manage token"
+            }"#;
+            let _ = happy_path(Auth::Token(&user.manage_token), body).await;
+        }
     }
 }
