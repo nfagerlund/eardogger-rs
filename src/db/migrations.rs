@@ -165,7 +165,7 @@ impl<'a> Migrations<'a> {
 
     /// Basically a wordier version of .validate(), meant for printing info to the terminal.
     #[tracing::instrument(skip_all)]
-    pub async fn info(&self) -> anyhow::Result<Vec<Status>> {
+    pub async fn info(&self) -> sqlx::Result<Vec<Status>> {
         // Using write pool bc there's a small chance of CREATE TABLE.
         // Also this happens before normal operation so we aren't worried about contention.
         let mut conn = self.write_pool().acquire().await?;

@@ -12,7 +12,7 @@
 use sqlx::query_scalar;
 use time::{Duration, OffsetDateTime};
 
-use crate::util::ListMeta;
+use crate::util::{ListMeta, MixedError, UserError};
 
 use super::tokens::TokenScope;
 use super::Db;
@@ -222,16 +222,42 @@ async fn user_password_auth() {
     assert_eq!(user.username, "test_peep");
     assert_eq!(user.email.as_deref(), Some("nf@example.com"));
     // No blank usernames
-    assert!(users.create("", "aoeua", None).await.is_err());
+    let bl_err = users
+        .create("", "aoeua", None)
+        .await
+        .expect_err("must error");
+    let MixedError::User(UserError::BadUsername { .. }) = bl_err else {
+        panic!("must return BadUsername");
+    };
     // No blank passwords (this is a change from eardogger 1, where that just disabled login)
-    assert!(users.create("", "", None).await.is_err());
+    let bl_pw = users
+        .create("blanka", "", None)
+        .await
+        .expect_err("must error");
+    let MixedError::User(UserError::BlankPassword) = bl_pw else {
+        panic!("must return BlankPassword");
+    };
     // No spaces in username
-    assert!(users.create("space cadet", "aoeu", None).await.is_err());
+    let sp_err = users
+        .create("space cadet", "aoeu", None)
+        .await
+        .expect_err("must error");
+    let MixedError::User(UserError::BadUsername { .. }) = sp_err else {
+        panic!("must return BadUsername");
+    };
     // Space in pw ok tho
     assert!(users
         .create("spacecadet", " im in space", None)
         .await
         .is_ok());
+    // No duplicate usernames
+    let dup_err = users
+        .create("spacecadet", "im on earth", None)
+        .await
+        .expect_err("must error");
+    let MixedError::User(UserError::UserExists { .. }) = dup_err else {
+        panic!("must return UserExists");
+    };
     assert!(users
         .authenticate("spacecadet", " im in space")
         .await
@@ -347,6 +373,21 @@ async fn dogears() {
         )
         .await
         .expect("no err");
+    // Can't create a dogear over the top of an existing one. (although: overlapping
+    // but non-identical prefixes are ok.)
+    let err = dogears
+        .create(
+            user.id,
+            "example.com/comic/",
+            "https://example.com/comic/6",
+            None,
+        )
+        .await
+        .expect_err("must error");
+    match err {
+        MixedError::User(UserError::DogearExists { .. }) => (),
+        _ => panic!("wrong error: {} (should be DogearExists)", err),
+    };
     // LIST: now there's three
     let (list, meta) = dogears.list(user.id, 1, 50).await.expect("no err");
     assert_eq!(list.len(), 3);

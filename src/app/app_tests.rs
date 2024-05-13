@@ -100,9 +100,7 @@ fn assert_no_cors(resp: &Response<Body>) {
 /// This one consumes the response body, so it needs ownership and async.
 async fn assert_api_insufficient_permissions(resp: Response<Body>) {
     let status = resp.status();
-    let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    let err =
-        serde_json::from_slice::<RawJsonError>(&body_bytes).expect("couldn't deserialize err body");
+    let err = api_error_body(resp).await.unwrap();
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert!(err.error.contains("permissions"));
 }
@@ -124,11 +122,15 @@ async fn assert_api_auth_required(
         .unwrap();
     let resp = do_req(app, req).await;
     let status = resp.status();
-    let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    let err =
-        serde_json::from_slice::<RawJsonError>(&body_bytes).expect("couldn't deserialize err body");
+    let err = api_error_body(resp).await.unwrap();
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(err.error.contains("aren't"));
+}
+
+/// Consumes a response to return a RawJsonError (or not).
+async fn api_error_body(resp: Response<Body>) -> Result<RawJsonError, serde_json::Error> {
+    let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    serde_json::from_slice::<RawJsonError>(&body_bytes)
 }
 
 #[tokio::test]
@@ -206,6 +208,35 @@ async fn api_list_test() {
             .unwrap();
         let resp = do_req(&mut app, req).await;
         assert_api_insufficient_permissions(resp).await;
+    }
+    // 6. Bad page size: legible 400 error
+    {
+        let req = new_req("GET", "/api/v1/list?page=1&size=50000")
+            .json()
+            .token(&user.manage_token)
+            .body(Body::empty())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let _ = api_error_body(resp).await;
+    }
+    // 7: Good page size: 👍🏼
+    {
+        let req = new_req("GET", "/api/v1/list?page=2&size=1")
+            .json()
+            .session(&user.session_id)
+            .body(Body::empty())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let list: ApiDogearsList = serde_json::from_slice(&body_bytes).unwrap();
+        // Innate to test data: you start w/ 2 bookmarks.
+        assert_eq!(list.meta.pagination.total_count, 2);
+        assert_eq!(list.meta.pagination.total_pages, 2);
+        assert_eq!(list.meta.pagination.current_page, 2);
+        assert_eq!(list.data.len(), 1);
+        assert!(list.data[0].current.contains("example.com"));
     }
 }
 
@@ -312,8 +343,8 @@ async fn api_create_test() {
     // 2. 401 when not authenticated
     {
         let body = r#"{
-            "prefix": "example.com/cors",
-            "current": "http://example.com/cors/0"
+            "prefix": "example.com/noone",
+            "current": "http://example.com/noone/0"
         }"#;
         assert_api_auth_required(&mut app, "POST", uri, Some(body.into())).await;
     }
@@ -371,5 +402,20 @@ async fn api_create_test() {
             }"#;
             let _ = happy_path(Auth::Token(&user.manage_token), body).await;
         }
+    }
+    // 4: Legible 409 conflict err on duplicate create
+    {
+        let body = r#"{
+            "prefix": "example.com/comic",
+            "current": "http://example.com/comic/99"
+        }"#;
+        let req = new_req("POST", uri)
+            .json()
+            .token(&user.write_token)
+            .body(body.into())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        let _ = api_error_body(resp).await;
     }
 }

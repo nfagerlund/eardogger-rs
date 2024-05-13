@@ -25,6 +25,7 @@
 //! T: Error.
 
 use crate::config::is_production;
+use crate::util::IntoHandlerError;
 use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
@@ -128,22 +129,10 @@ impl WebError {
     }
 }
 
-// Well, I wanted to dive into the potential nested errors from Error::source(),
-// but it turns out that anyhow::Error _does not implement std::error::Error!_
-// Hoisted by my own whatever you call it!!! The more I think about it, the more
-// it makes sense that that would be the case, it just never occurred to me when
-// I was laying out the database helpers. Anyway, because a::E doesn't implement
-// Error but _might_ theoretically in the future, rust won't let me have both a
-// blanket impl for E: Error and a specific impl for anyhow::Error, so oof.
-// I think the workaround for now is, you don't get to see the source errors,
-// and I'll just use a trait bound that fits both std error and anyhow error.
-// I could reconsider that in the future by following what fasterthanlime did and
-// enforcing a side-trip through anyhow for all errors, or I could just deal.
-impl<E: ToString> From<E> for WebError {
+impl<E: IntoHandlerError> From<E> for WebError {
     fn from(value: E) -> Self {
-        // For quick-and-dirty error returns, use a default HTTP error code of 500.
-        // This is almost always correct.
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, value.to_string())
+        let (status, msg) = value.status_and_message();
+        Self::new(status, msg)
     }
 }
 
@@ -167,11 +156,10 @@ impl ApiError {
     }
 }
 
-impl<E: ToString> From<E> for ApiError {
+impl<E: IntoHandlerError> From<E> for ApiError {
     fn from(value: E) -> Self {
-        // For quick-and-dirty error returns, use a default HTTP error code of 500.
-        // This is almost always correct.
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, value.to_string())
+        let (status, msg) = value.status_and_message();
+        Self::new(status, msg)
     }
 }
 

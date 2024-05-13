@@ -1,5 +1,5 @@
 use super::{core::Db, users::User};
-use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta};
+use crate::util::{sha256sum, sqlite_offset, uuid_string, ListMeta, MixedError};
 use serde::Serialize;
 use sqlx::{query, query_as, query_scalar, SqlitePool};
 use time::{serde::iso8601, OffsetDateTime};
@@ -104,7 +104,7 @@ impl<'a> Tokens<'a> {
         user_id: i64,
         scope: TokenScope,
         comment: Option<&str>,
-    ) -> anyhow::Result<(Token, String)> {
+    ) -> sqlx::Result<(Token, String)> {
         let token_cleartext = format!("eardoggerv1.{}", uuid_string());
         let token_hash = sha256sum(&token_cleartext);
         let scope_str: &str = scope.into();
@@ -129,10 +129,7 @@ impl<'a> Tokens<'a> {
     /// Use the provided token cleartext to look up a token and its associated user.
     /// Returns Ok(None) if the token doesn't match anything.
     #[tracing::instrument(skip_all)]
-    pub async fn authenticate(
-        &self,
-        token_cleartext: &str,
-    ) -> anyhow::Result<Option<(Token, User)>> {
+    pub async fn authenticate(&self, token_cleartext: &str) -> sqlx::Result<Option<(Token, User)>> {
         let token_hash = sha256sum(token_cleartext);
         let current_timestamp = OffsetDateTime::now_utc();
 
@@ -215,7 +212,7 @@ impl<'a> Tokens<'a> {
     /// Returns Err on database problems, Ok(None) if db's ok but there's
     /// nothing to delete.
     #[tracing::instrument(skip_all)]
-    pub async fn destroy(&self, id: i64, user_id: i64) -> anyhow::Result<Option<()>> {
+    pub async fn destroy(&self, id: i64, user_id: i64) -> sqlx::Result<Option<()>> {
         let res = query!(
             r#"
                 DELETE FROM tokens
@@ -240,7 +237,7 @@ impl<'a> Tokens<'a> {
         user_id: i64,
         page: u32,
         size: u32,
-    ) -> anyhow::Result<(Vec<Token>, ListMeta)> {
+    ) -> Result<(Vec<Token>, ListMeta), MixedError<sqlx::Error>> {
         // Do multiple reads in a transaction, so count and list see the
         // same causal slice.
         let mut tx = self.read_pool().begin().await?;
