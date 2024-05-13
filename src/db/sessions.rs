@@ -67,7 +67,7 @@ impl<'a> Sessions<'a> {
     /// blocking a user request... but it should happen fairly often so the
     /// number of sessions to waste at once never gets very large.
     #[tracing::instrument(skip_all)]
-    pub async fn delete_expired(&self) -> anyhow::Result<u64> {
+    pub async fn delete_expired(&self) -> sqlx::Result<u64> {
         // y'know, ideally I would like to set a limit for how many
         // records to waste at a time, just to guard against blowouts...
         // but it's behind the SQLITE_ENABLE_UPDATE_DELETE_LIMIT compile-time
@@ -79,13 +79,12 @@ impl<'a> Sessions<'a> {
         )
         .execute(self.write_pool())
         .await
-        .map_err(|e| e.into())
         .map(|v| v.rows_affected())
     }
 
     /// Make a new user login session
     #[tracing::instrument(skip(self))]
-    pub async fn create(&self, user_id: i64) -> anyhow::Result<Session> {
+    pub async fn create(&self, user_id: i64) -> sqlx::Result<Session> {
         let sessid = uuid_string();
         let csrf_token = uuid_string();
         let new_expires = OffsetDateTime::now_utc() + Duration::days(SESSION_LIFETIME_DAYS);
@@ -104,12 +103,11 @@ impl<'a> Sessions<'a> {
         )
         .fetch_one(self.write_pool())
         .await
-        .map_err(|e| e.into())
     }
 
     /// Returns Ok(Some) on success, Ok(None) on a well-behaved not-found.
     #[tracing::instrument(skip_all)]
-    pub async fn destroy(&self, sessid: &str) -> anyhow::Result<Option<()>> {
+    pub async fn destroy(&self, sessid: &str) -> sqlx::Result<Option<()>> {
         let res = query!(
             r#"
                 DELETE FROM sessions
@@ -130,7 +128,7 @@ impl<'a> Sessions<'a> {
     /// still valid). As a side-effect, updates the session's expiration date
     /// to maintain the rolling window.
     #[tracing::instrument(skip_all)]
-    pub async fn authenticate(&self, sessid: &str) -> anyhow::Result<Option<(Session, User)>> {
+    pub async fn authenticate(&self, sessid: &str) -> sqlx::Result<Option<(Session, User)>> {
         let new_expires = OffsetDateTime::now_utc() + Duration::days(SESSION_LIFETIME_DAYS);
 
         // First, get the stuff
