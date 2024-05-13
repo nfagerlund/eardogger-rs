@@ -75,24 +75,23 @@ impl TestRequestBuilder for Builder {
     }
 }
 
-/// Returns true if the response excludes the Access-Control-Allow-Methods
+/// Panics if the response excludes the Access-Control-Allow-Methods
 /// header (which browsers require in order to permit a CORS request).
-fn no_cors(resp: &Response<Body>) -> bool {
-    !resp
+fn assert_no_cors(resp: &Response<Body>) {
+    assert!(!resp
         .headers()
-        .contains_key(header::ACCESS_CONTROL_ALLOW_METHODS)
+        .contains_key(header::ACCESS_CONTROL_ALLOW_METHODS));
 }
 
-/// Returns true if the response is a 403 due to insufficient token scope.
+/// Panics unless the response is a 403 due to insufficient token scope.
 /// This one consumes the response body, so it needs ownership and async.
-async fn api_insufficient_permissions(resp: Response<Body>) -> bool {
+async fn assert_api_insufficient_permissions(resp: Response<Body>) {
     let status = resp.status();
     let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    if let Ok(err) = serde_json::from_slice::<RawJsonError>(&body_bytes) {
-        status == StatusCode::FORBIDDEN && err.error.contains("permissions")
-    } else {
-        false // couldn't deserialize
-    }
+    let err =
+        serde_json::from_slice::<RawJsonError>(&body_bytes).expect("couldn't deserialize err body");
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(err.error.contains("permissions"));
 }
 
 /// Does an API request without providing any auth, and panics unless the response
@@ -137,7 +136,7 @@ async fn api_list_test() {
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
-        assert!(no_cors(&resp));
+        assert_no_cors(&resp);
 
         // plain GET
         let req = new_req("GET", "/api/v1/list")
@@ -147,7 +146,7 @@ async fn api_list_test() {
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
-        assert!(no_cors(&resp));
+        assert_no_cors(&resp);
     }
     // 2. Logged out: 401.
     {
@@ -193,7 +192,7 @@ async fn api_list_test() {
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
-        assert!(api_insufficient_permissions(resp).await);
+        assert_api_insufficient_permissions(resp).await;
     }
 }
 
@@ -224,7 +223,7 @@ async fn api_delete_test() {
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
-        assert!(no_cors(&resp));
+        assert_no_cors(&resp);
     }
     // 2. 401 when logged out
     {
@@ -259,7 +258,7 @@ async fn api_delete_test() {
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
-        assert!(api_insufficient_permissions(resp).await);
+        assert_api_insufficient_permissions(resp).await;
     }
     // ...second verse, same as the first, this time it works.
     {
