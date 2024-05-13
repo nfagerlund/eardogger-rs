@@ -156,7 +156,8 @@ impl Db {
     }
 }
 
-/// A helper struct for setting up data in tests.
+/// Test data helper. Credentials for a user who has two dogears
+/// (example.com/comic and /serial).
 #[cfg(test)]
 pub struct TestUser {
     pub name: String,
