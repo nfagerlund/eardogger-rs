@@ -32,6 +32,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use tracing::error;
 
 /// An IntoResponse-implementing type that can display error content as either
 /// an HTML error page, or a JSON error object. By using wrapper types that
@@ -77,6 +78,7 @@ impl IntoResponse for AppError {
             status,
             kind,
         } = self;
+        error!(%message, "uncaught 500 error");
         // Suppress 500 error details for prod. (Other error codes are fine,
         // but 500s could be pretty much anything.)
         let message = if is_production() && status == StatusCode::INTERNAL_SERVER_ERROR {
