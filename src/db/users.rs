@@ -1,12 +1,12 @@
 use super::core::Db;
-use crate::util::clean_optional_form_field;
+use crate::util::{clean_optional_form_field, MixedError, UserError};
 
-use anyhow::anyhow;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Serialize;
-use sqlx::{query, query_as, SqlitePool};
+use sqlx::{error::ErrorKind, query, query_as, SqlitePool};
 use time::OffsetDateTime;
+use tracing::error;
 
 /// A query helper type for operating on [User]s. Usually you rent this from
 /// a [Db].
@@ -49,7 +49,7 @@ impl From<UserWithPasswordHash> for User {
 /// Trim whitespace and validate allowed username characters.
 /// Ascii letters/numbers/joiners is too restrictive, but now's not the
 /// time to loosen it. Maybe later.
-fn clean_username(username: &str) -> anyhow::Result<&str> {
+fn clean_username(username: &str) -> Result<&str, UserError> {
     lazy_static! {
         static ref USERNAME_REGEX: Regex = Regex::new(r#"\A[a-zA-Z0-9_-]{1,80}\z"#).unwrap();
     }
@@ -57,15 +57,14 @@ fn clean_username(username: &str) -> anyhow::Result<&str> {
     if USERNAME_REGEX.is_match(username) {
         Ok(username)
     } else {
-        Err(anyhow!(
-            r#"Can't use "{}" as a username on this site. Usernames can only use letters, numbers, hyphens (-), and underscores (_), and can't be longer than 80 characters."#,
-            username
-        ))
+        Err(UserError::BadUsername {
+            name: username.to_string(),
+        })
     }
 }
-fn valid_password(password: &str) -> anyhow::Result<&str> {
+fn valid_password(password: &str) -> Result<&str, UserError> {
     if password.is_empty() {
-        Err(anyhow!("Empty password isn't allowed."))
+        Err(UserError::BlankPassword)
     } else {
         Ok(password)
     }
@@ -90,11 +89,13 @@ impl<'a> Users<'a> {
         username: &str,
         password: &str,
         email: Option<&str>,
-    ) -> anyhow::Result<User> {
+    ) -> Result<User, MixedError<sqlx::Error>> {
         let username = clean_username(username)?;
         let email = clean_optional_form_field(email);
         let password = valid_password(password)?;
-        let password_hash = bcrypt::hash(password, 12)?;
+        let password_hash = bcrypt::hash(password, 12).map_err(|_| {
+            UserError::Impossible("bcrypt hash of statically-known cost had illegal cost")
+        })?;
 
         query_as!(
             User,
@@ -109,7 +110,17 @@ impl<'a> Users<'a> {
         )
         .fetch_one(self.write_pool())
         .await
-        .map_err(|e| e.into())
+        .map_err(|e| match e {
+            // Need to catch unique constraint violation and return friendly error; any
+            // other sqlx errors are 500s in this case.
+            sqlx::Error::Database(dbe) if dbe.kind() == ErrorKind::UniqueViolation => {
+                UserError::UserExists {
+                    name: username.to_string(),
+                }
+                .into()
+            }
+            _ => e.into(),
+        })
     }
 
     /// Fetch a user and their password hash, by name. Deliberately not public API.
@@ -117,7 +128,7 @@ impl<'a> Users<'a> {
     async fn by_name_with_password_hash(
         &self,
         username: &str,
-    ) -> anyhow::Result<Option<UserWithPasswordHash>> {
+    ) -> sqlx::Result<Option<UserWithPasswordHash>> {
         let username = username.trim();
 
         query_as!(
@@ -130,13 +141,12 @@ impl<'a> Users<'a> {
         )
         .fetch_optional(self.read_pool()) // NICE!!!!
         .await
-        .map_err(|e| e.into())
     }
 
     /// Test helper: Just fetch a user. App logic should always find users
     /// via the `authenticate` methods on Users / Sessions / Tokens.
     #[cfg(test)]
-    pub async fn by_name(&self, username: &str) -> anyhow::Result<Option<User>> {
+    pub async fn by_name(&self, username: &str) -> sqlx::Result<Option<User>> {
         Ok(self
             .by_name_with_password_hash(username)
             .await?
@@ -152,6 +162,9 @@ impl<'a> Users<'a> {
         password: &str,
     ) -> anyhow::Result<Option<User>> {
         if let Some(user) = self.by_name_with_password_hash(username).await? {
+            // Reason this function has to return an anyhow is bc there's
+            // several unlikely reasons bcrypt::verify can fail and they're
+            // all worthy of 500 errors.
             if bcrypt::verify(password, &user.password_hash)? {
                 return Ok(Some(user.into()));
             }
@@ -161,8 +174,15 @@ impl<'a> Users<'a> {
 
     /// Hard-set a user's password. IMPORTANT: assumes you've already validated the inputs!
     #[tracing::instrument(skip_all)]
-    pub async fn set_password(&self, username: &str, new_password: &str) -> anyhow::Result<()> {
-        let password_hash = bcrypt::hash(new_password, 12)?;
+    pub async fn set_password(
+        &self,
+        username: &str,
+        new_password: &str,
+    ) -> Result<(), MixedError<sqlx::Error>> {
+        let password_hash = bcrypt::hash(new_password, 12).map_err(|_| {
+            UserError::Impossible("bcrypt hash of statically-known cost had illegal cost")
+        })?;
+
         let res = query!(
             r#"
                 UPDATE users SET password_hash = ?1
@@ -174,7 +194,8 @@ impl<'a> Users<'a> {
         .execute(self.write_pool())
         .await?;
         if res.rows_affected() != 1 {
-            Err(anyhow!("Couldn't find user with name {}.", username))
+            error!(%username, "unable to find logged-in user");
+            Err(UserError::Impossible("user is both logged-in and nonexistent").into())
         } else {
             Ok(())
         }
@@ -184,7 +205,11 @@ impl<'a> Users<'a> {
     /// instead of ID in order to give better errors, since these errors
     /// will definitely flow all the way up to the frontend.
     #[tracing::instrument(skip_all)]
-    pub async fn set_email(&self, username: &str, email: Option<&str>) -> anyhow::Result<()> {
+    pub async fn set_email(
+        &self,
+        username: &str,
+        email: Option<&str>,
+    ) -> Result<(), MixedError<sqlx::Error>> {
         let email = clean_optional_form_field(email);
 
         let res = query!(
@@ -198,7 +223,8 @@ impl<'a> Users<'a> {
         .execute(self.write_pool())
         .await?;
         if res.rows_affected() != 1 {
-            Err(anyhow!("Couldn't find user with name {}", username))
+            error!(%username, "unable to find logged-in user");
+            Err(UserError::Impossible("user is both logged-in and nonexistent").into())
         } else {
             Ok(())
         }
@@ -206,7 +232,7 @@ impl<'a> Users<'a> {
 
     /// Returns Ok(Some) on success, Ok(None) on not-found.
     #[tracing::instrument(skip_all)]
-    pub async fn destroy(&self, id: i64) -> anyhow::Result<Option<()>> {
+    pub async fn destroy(&self, id: i64) -> sqlx::Result<Option<()>> {
         let res = query!(
             r#"
                 DELETE FROM users WHERE id = ?;

@@ -25,6 +25,15 @@ pub enum UserError {
     #[error("Can't bookmark an invalid or non-http(s) URL: {url}")]
     DogearInvalidUrl { url: String },
 
+    #[error("Can't use {name} as a username on this site. Usernames can only use letters, numbers, hyphens (-), and underscores (_), and can't be longer than 80 characters.")]
+    BadUsername { name: String },
+
+    #[error("User {name} already exists.")]
+    UserExists { name: String },
+
+    #[error("Empty password isn't allowed.")]
+    BlankPassword,
+
     // This happens when the provided value of the Origin header can't
     // be turned back into a HeaderValue. I'm pretty sure something
     // further out in the stack would explode long before this reached my code.
@@ -48,6 +57,9 @@ impl IntoHandlerError for UserError {
             UserError::HttpFucked => StatusCode::IM_A_TEAPOT,
             UserError::Impossible(_) => StatusCode::INTERNAL_SERVER_ERROR,
             UserError::PageOversize => StatusCode::BAD_REQUEST,
+            UserError::BadUsername { .. } => StatusCode::BAD_REQUEST,
+            UserError::BlankPassword => StatusCode::BAD_REQUEST,
+            UserError::UserExists { .. } => StatusCode::CONFLICT,
         };
         (status, self.to_string())
     }
