@@ -114,7 +114,7 @@ impl<'a> Migrations<'a> {
 
     /// Check whether the database migrations are in a usable state. For background
     /// on the logic in here, consult the source of the sqlx CLI:
-    /// https://github.com/launchbadge/sqlx/blob/5d6c33ed65cc2/sqlx-cli/src/migrate.rs
+    /// <https://github.com/launchbadge/sqlx/blob/5d6c33ed65cc2/sqlx-cli/src/migrate.rs>
     /// We're doing a fast and dirty version of the same thing.
     #[tracing::instrument(skip_all)]
     pub async fn validate(&self) -> anyhow::Result<()> {

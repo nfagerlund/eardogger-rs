@@ -51,7 +51,7 @@ pub struct LogConfig {
 pub struct LogFileConfig {
     /// The directory to use for log files.
     pub directory: PathBuf,
-    /// The log file prefix. Files will have names like <name>.<timestamp>.log.
+    /// The log file prefix. Files will have names like `<name>.<timestamp>.log`.
     pub name: String,
     /// How many days of logs to keep. Excess logs are auto-deleted.
     pub days: usize,
