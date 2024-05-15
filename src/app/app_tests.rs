@@ -435,9 +435,39 @@ async fn api_update_test() {
     let user = state.db.test_user("whoever").await.unwrap();
     let uri = "/api/v1/update";
 
+    // reusable test case -- wants a new page number for our example comic.
+    // success means: 200 and a Vec<Dogear> with all updated bookmarks.
+    let closure_cloneable = app.clone(); // so we can mutably borrow `app` in other test cases.
+    let happy_path = |num: u32, auth: Auth| {
+        let mut app = closure_cloneable.clone();
+        // since it's a format string, the json curlies need doubling.
+        let body = format!(r#"{{"current": "http://example.com/comic/{}"}}"#, num);
+        let req = new_req("POST", uri)
+            .json()
+            .auth(auth)
+            .header(header::ORIGIN, "http://example.com")
+            .body(body.into())
+            .unwrap();
+        async move {
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let updated: Vec<Dogear> =
+                serde_json::from_slice(&body).expect("wanted Vec<Dogear> back");
+            assert_eq!(updated.len(), 1);
+            // updated the current value
+            assert_eq!(
+                updated[0].current,
+                format!("http://example.com/comic/{}", num)
+            );
+            // hit the expected pre-existing prefix from test data
+            assert_eq!(updated[0].prefix, "example.com/comic");
+            updated
+        }
+    };
+
     // 1: CORS is yes, actually.
-    // 1.1: write token is ok
-    // 1.2: on hit, 200 and a Vec<Dogear> with changed.
+    // 1.1: write token works, manage token works, login session works.
     {
         // preflight
         let opt_req = new_req("OPTIONS", uri)
@@ -446,6 +476,7 @@ async fn api_update_test() {
             .body(Body::empty())
             .unwrap();
         let opt = do_req(&mut app, opt_req).await;
+        // u can post
         assert_eq!(
             opt.headers()
                 .get(header::ACCESS_CONTROL_ALLOW_METHODS)
@@ -459,24 +490,13 @@ async fn api_update_test() {
             "http://example.com"
         );
 
-        // now the real request
-        let body = r#"{
-            "current": "http://example.com/comic/10"
-        }"#;
-        let req = new_req("POST", uri)
-            .json()
-            .token(&user.write_token)
-            .header(header::ORIGIN, "http://example.com")
-            .body(body.into())
-            .unwrap();
-        let resp = do_req(&mut app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = body_bytes(resp).await;
-        let updated: Vec<Dogear> = serde_json::from_slice(&body).expect("wanted Vec<Dogear> back");
-        assert_eq!(updated.len(), 1);
-        assert_eq!(updated[0].current, "http://example.com/comic/10");
+        // now some real requests
+        happy_path(10, Auth::Token(&user.write_token)).await;
+        happy_path(13, Auth::Token(&user.manage_token)).await;
+        happy_path(14, Auth::Session(&user.session_id)).await;
+        // Well, never mind that a session request prolly wouldn't come with an Origin header...
     }
-    // 2. CORS from wrong origin is 404.
+    // 2. CORS from wrong origin is 404 even if matching bookmark exists.
     {
         let body = r#"{
             "current": "http://example.com/comic/12"
@@ -491,22 +511,38 @@ async fn api_update_test() {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let _ = api_error_body(resp).await.expect("need error body");
     }
-    // 3. Manage token is ok too.
+    // 3. 401 when not authenticated
     {
         let body = r#"{
-            "current": "http://example.com/comic/13"
+            "current": "http://example.com/comic/12"
         }"#;
         let req = new_req("POST", uri)
             .json()
-            .token(&user.manage_token)
             .header(header::ORIGIN, "http://example.com")
             .body(body.into())
             .unwrap();
         let resp = do_req(&mut app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = body_bytes(resp).await;
-        let updated: Vec<Dogear> = serde_json::from_slice(&body).expect("wanted Vec<Dogear> back");
-        assert_eq!(updated.len(), 1);
-        assert_eq!(updated[0].current, "http://example.com/comic/13");
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let _ = api_error_body(resp).await.expect("need error body");
+    }
+    // 4. Busted request: unprocessable
+    {
+        let body = r#"{
+            "whuh???": "http://example.com/comic/12"
+        }"#;
+        let req = new_req("POST", uri)
+            .json()
+            .token(&user.write_token)
+            .body(body.into())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        // TODO: The error is coming from the Json extractor's Rejection type,
+        // which doesn't match the format of ApiError. (It's a line of plain
+        // text message.) I can wrap the extractor to customize the Rejection,
+        // but maybe that's more trouble than this is worth, since no one else
+        // is using this API but me.
+        // https://github.com/tokio-rs/axum/blob/main/examples/customize-extractor-error/src/derive_from_request.rs
+        // let _ = api_error_body(resp).await.expect("need error body");
     }
 }
