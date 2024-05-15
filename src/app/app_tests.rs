@@ -88,6 +88,28 @@ impl TestRequestBuilder for Builder {
     }
 }
 
+/// Consumes response. Panics unless it's status 200 and contains the login form.
+async fn assert_login_page(resp: Response<Body>) {
+    assert_page_and_contains(resp, r#"form action="/login""#).await;
+}
+
+/// Consumes response. Panics unless it's status 200 and contains the
+/// specified substring in the body.
+async fn assert_page_and_contains(resp: Response<Body>, substr: &str) {
+    assert_page_and_contains_all(resp, &[substr]).await;
+}
+
+/// Consumes response. Panics unless it's status 200 and contains
+/// ALL of the specified substrings in the body.
+async fn assert_page_and_contains_all(resp: Response<Body>, substrs: &[&str]) {
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_bytes(resp).await;
+    let body_str = bytes_str(&body);
+    for &s in substrs {
+        assert!(body_str.contains(s));
+    }
+}
+
 /// Panics if the response excludes the Access-Control-Allow-Methods
 /// header (which browsers require in order to permit a CORS request).
 fn assert_no_cors(resp: &Response<Body>) {
@@ -136,6 +158,11 @@ async fn api_error_body(resp: Response<Body>) -> Result<RawJsonError, serde_json
 /// Consumes a response to return the body as a Bytes.
 async fn body_bytes(resp: Response<Body>) -> Bytes {
     to_bytes(resp.into_body(), usize::MAX).await.unwrap()
+}
+
+/// Borrows a Bytes as a &str for quick .contains() checks. Panics on non-utf8.
+fn bytes_str(b: &Bytes) -> &str {
+    std::str::from_utf8(b.as_ref()).unwrap()
 }
 
 #[tokio::test]
@@ -544,5 +571,72 @@ async fn api_update_test() {
         // is using this API but me.
         // https://github.com/tokio-rs/axum/blob/main/examples/customize-extractor-error/src/derive_from_request.rs
         // let _ = api_error_body(resp).await.expect("need error body");
+    }
+}
+
+// /public and /status
+#[tokio::test]
+async fn app_basics_noauth_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+
+    // Static file serving is hooked up right
+    let req = new_req("GET", "/public/style.css")
+        .body(Body::empty())
+        .unwrap();
+    let resp = do_req(&mut app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_bytes(resp).await;
+    let body_str = bytes_str(&body);
+    assert!(body_str.contains("--color-background"));
+
+    // Status is hooked up right
+    let req = new_req("GET", "/status").body(Body::empty()).unwrap();
+    let resp = do_req(&mut app, req).await;
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn index_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // No login: serves login page
+    {
+        let req = new_req("GET", "/").body(Body::empty()).unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_login_page(resp).await;
+    }
+    // AuthSession extractor is properly hooked up: token is same as
+    // no login. This is the only time I'll test this, other routes can
+    // just trust the type assurances.
+    {
+        let req = new_req("GET", "/")
+            .token(&user.manage_token)
+            .body(Body::empty())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_login_page(resp).await;
+    }
+    // Yes login: serves the dogears list.
+    {
+        let req = new_req("GET", "/")
+            .session(&user.session_id)
+            .body(Body::empty())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_page_and_contains_all(
+            resp,
+            &[
+                // from layout:
+                r#"href="/account""#,
+                // from index.html:
+                "Manual mode",
+                // from dogears list fragment:
+                r#"class="date">Last read:"#,
+            ],
+        )
+        .await;
     }
 }
