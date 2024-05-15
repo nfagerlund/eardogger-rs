@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use axum::body::{to_bytes, Body};
+use axum::body::{to_bytes, Body, Bytes};
 use http::{header, request::Builder, Request, Response, StatusCode};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -129,8 +129,13 @@ async fn assert_api_auth_required(
 
 /// Consumes a response to return a RawJsonError (or not).
 async fn api_error_body(resp: Response<Body>) -> Result<RawJsonError, serde_json::Error> {
-    let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<RawJsonError>(&body_bytes)
+    let body = body_bytes(resp).await;
+    serde_json::from_slice::<RawJsonError>(&body)
+}
+
+/// Consumes a response to return the body as a Bytes.
+async fn body_bytes(resp: Response<Body>) -> Bytes {
+    to_bytes(resp.into_body(), usize::MAX).await.unwrap()
 }
 
 #[tokio::test]
@@ -417,5 +422,91 @@ async fn api_create_test() {
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::CONFLICT);
         let _ = api_error_body(resp).await;
+    }
+}
+
+#[tokio::test]
+async fn api_update_test() {
+    use crate::db::Dogear;
+
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+
+    let user = state.db.test_user("whoever").await.unwrap();
+    let uri = "/api/v1/update";
+
+    // 1: CORS is yes, actually.
+    // 1.1: write token is ok
+    // 1.2: on hit, 200 and a Vec<Dogear> with changed.
+    {
+        // preflight
+        let opt_req = new_req("OPTIONS", uri)
+            .json()
+            .header(header::ORIGIN, "http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        let opt = do_req(&mut app, opt_req).await;
+        assert_eq!(
+            opt.headers()
+                .get(header::ACCESS_CONTROL_ALLOW_METHODS)
+                .unwrap(),
+            "POST"
+        );
+        assert_eq!(
+            opt.headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .unwrap(),
+            "http://example.com"
+        );
+
+        // now the real request
+        let body = r#"{
+            "current": "http://example.com/comic/10"
+        }"#;
+        let req = new_req("POST", uri)
+            .json()
+            .token(&user.write_token)
+            .header(header::ORIGIN, "http://example.com")
+            .body(body.into())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_bytes(resp).await;
+        let updated: Vec<Dogear> = serde_json::from_slice(&body).expect("wanted Vec<Dogear> back");
+        assert_eq!(updated.len(), 1);
+        assert_eq!(updated[0].current, "http://example.com/comic/10");
+    }
+    // 2. CORS from wrong origin is 404.
+    {
+        let body = r#"{
+            "current": "http://example.com/comic/12"
+        }"#;
+        let req = new_req("POST", uri)
+            .json()
+            .token(&user.write_token)
+            .header(header::ORIGIN, "http://example.horse")
+            .body(body.into())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let _ = api_error_body(resp).await.expect("need error body");
+    }
+    // 3. Manage token is ok too.
+    {
+        let body = r#"{
+            "current": "http://example.com/comic/13"
+        }"#;
+        let req = new_req("POST", uri)
+            .json()
+            .token(&user.manage_token)
+            .header(header::ORIGIN, "http://example.com")
+            .body(body.into())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_bytes(resp).await;
+        let updated: Vec<Dogear> = serde_json::from_slice(&body).expect("wanted Vec<Dogear> back");
+        assert_eq!(updated.len(), 1);
+        assert_eq!(updated[0].current, "http://example.com/comic/13");
     }
 }
