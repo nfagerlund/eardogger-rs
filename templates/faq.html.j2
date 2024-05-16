@@ -4,33 +4,26 @@
 {% block body %}
 <h2 id="what-is">What's Eardogger?</h2>
 
-<p>Eardogger is a bookmarking service for long webcomics and web-books.</p>
+<p>Eardogger is a bookmark tool for binge-reading comics and books on the web.</p>
 
-<p>There's lots of ways to bookmark a web page, but this one is weird because it's designed for <em>reading</em> (instead of <em>remembering</em> or <em>researching</em>):</p>
+<p>I made it because there's lots of nice ways to follow an ongoing comic, but I couldn't find a nice way to <em>catch up on a backlog.</em> I kept losing my place, especially if I tried to pick up reading again on a different device.</p>
 
-<ul>
-  <li><strong>Only one bookmark per site.</strong> A marked page is just a temporary resting point in a larger work; when you read further and save your place again, Eardogger moves your old bookmark. In other words, it does "yesterday's bus ticket" bookmarks, not "six colors of sticky note" bookmarks.</li>
-  <li><strong>Available everywhere.</strong> Pause your reading on one device, resume wherever.</li>
-  <li><strong>Incredibly lazy.</strong> Pause or resume with one click on sites you've bookmarked before.</li>
-  <li><strong>Calls bookmarks "dogears"??</strong> I liked how sloppy and disreputable it sounded. 🐶</li>
-</ul>
+<p>Normal web browser bookmarks were too fiddly. What I wanted was something that acts like the receipt or bus pass marking my place in a physical book: <strong>there's one bookmark, and you move it to your new spot when you pause.</strong></p>
 
-<h2 id="how-to">How to Use Eardogger</h2>
+<p>So Eardogger does that.</p>
+
+<h2 id="how-to">How to Use It</h2>
 
 <ol>
   <li>Sign up for a free account.</li>
   <li><a href="/install">Install the "Mark my spot" and "Where was I" bookmarklets</a> on all your devices and browsers.</li>
   <li>To pause whatever you're reading, click "Mark my spot."
     <ul>
-      <li>If you've dogeared that site before, that's it! The dogear now marks your new position.</li>
-      <li>If this is a new site, Eardogger asks you for the site's name and makes a new dogear. (You can also adjust the URL prefix, for sites that share a domain with several other sites.)</li>
+      <li>This updates your existing bookmark in just one click! (Or, if you didn't have a bookmark for that site yet, it'll ask you to make one.)</li>
     </ul>
   </li>
-  <li>To resume reading a site from where you paused it, use the list of dogears on the <a href="/">Eardogger homepage</a>.
-    <ul>
-      <li>Or, if you're already on that site, click "Where was I." (Good for when you left a tab open but then read further on another device.)</li>
-    </ul>
-  </li>
+  <li>The <a href="/">Eardogger homepage</a> has a list of what you've been reading lately.</li>
+  <li>If you left a tab open but then read further in that site on another device, click "Where was I" to catch up.</li>
 </ol>
 
 <h2 id="news">News</h2>
@@ -51,23 +44,13 @@
 
 <p>I ended up going with <a href="https://fly.io">Fly</a> for the app container, and an upstart serverless Postgres thingy called <a href="https://neon.tech">Neon</a> for the database. Fly's free tier is quite generous (so I'm still living scrub life), but if I end up hosting bunch of other little containerized apps there, the bill for the surplus is more like $2 per. Neon doesn't even have paid tiers yet because it's baby, but it <em>looks</em> like their tech stack is actually novel enough to let them bill much more granularly than any of the existing Postgres-as-a-service outfits do, if they so choose. It'll be interesting to see how that shakes out!</p>
 
-<h2 id="faq">FAQ</h2>
+<h2 id="faq">Colophon</h2>
 
-<h3>Have any questions been frequently asked yet?</h3>
+<p>If you ever want to make a website kinda-sorta like this one, feel free to peruse the source code:</p>
 
-<p>Noootttttt really. I guess just text or @ me if you've got something.</p>
+<ul>
+  <li><a href="https://github.com/nfagerlund/eardogger-rs">The 2024-and-onward version</a>, written in Rust with Axum</li>
+  <li><a href="https://github.com/nfagerlund/eardogger">The 2019-2024 original recipe version</a>, written in TypeScript with Express</li>
+</ul>
 
-<h3>Can I save my place halfway through a page, or do I have to start at the top of a page?</h3>
-
-<p>If there are clickable "anchors" within a long page, you can save your spot at one of those; you just need to click it before you save, so that the anchor is included in the URL that gets sent to Eardogger.</p>
-
-<p><a href="https://doc.rust-lang.org/stable/book/ch00-00-introduction.html">The Rust book</a> does this, if you want to see an example; all the headers are clickable anchors.</p>
-
-<h3>Is this ~social~?</h3>
-
-<p>This is absolutely not ~social~. 🌻 I endorse texting your besties about what you're reading and/or avidly blogging that shit, but this website's highest ambition is to be a  💾 ｗｅｂ　ｓｃａｌｅ💽 version of the disintegrating receipt that's been marking your spot in <em>Ancillary Justice.</em></p>
-
-<h3>What is "elegance through stupidity?"</h3>
-
-<p>A nebulous design quality that I admire and aspire to.</p>
 {% endblock body %}
