@@ -58,7 +58,4 @@ tower-cookies = { version = "0.10.0", features = ["axum-core", "signed"] }
 tower-http = { version = "0.5.2", features = ["fs"] }
 minijinja = { version = "1.0.12", features = ["json"] }
 
-[dev-dependencies]
-tl = "0.7.8"
-
 # Clean-up:
