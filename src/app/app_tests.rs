@@ -2,6 +2,7 @@
 
 use axum::body::{to_bytes, Body, Bytes};
 use http::{header, request::Builder, Request, Response, StatusCode};
+use scraper::{Html, Selector};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
@@ -163,6 +164,11 @@ async fn body_bytes(resp: Response<Body>) -> Bytes {
 /// Borrows a Bytes as a &str for quick .contains() checks. Panics on non-utf8.
 fn bytes_str(b: &Bytes) -> &str {
     std::str::from_utf8(b.as_ref()).unwrap()
+}
+
+/// One-shot selector construction
+fn sel(s: &str) -> Selector {
+    Selector::parse(s).unwrap()
 }
 
 #[tokio::test]
@@ -626,17 +632,63 @@ async fn index_test() {
             .body(Body::empty())
             .unwrap();
         let resp = do_req(&mut app, req).await;
-        assert_page_and_contains_all(
-            resp,
-            &[
-                // from layout:
-                r#"href="/account""#,
-                // from index.html:
-                "Manual mode",
-                // from dogears list fragment:
-                r#"class="date">Last read:"#,
-            ],
-        )
-        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_bytes(resp).await;
+        let doc = Html::parse_document(bytes_str(&body));
+        // Includes main layout content for a logged-in user:
+        assert!(doc.select(&sel("nav a[href='/account']")).next().is_some());
+        assert!(doc.select(&sel("form#logout")).next().is_some());
+        // includes "manual mode" form, for now
+        assert!(doc.select(&sel("form#update-dogear")).next().is_some());
+        // Includes dogears list with all dogears (assumption: test user has 2)
+        assert_eq!(doc.select(&sel("#dogears li")).count(), 2);
+    }
+    // pagination.
+    // Assumption: test user has two dogears.
+    {
+        let req = new_req("GET", "/?size=1")
+            .session(&user.session_id)
+            .body(Body::empty())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_bytes(resp).await;
+        let doc = Html::parse_document(bytes_str(&body));
+        // dogears list present, has #size items
+        assert_eq!(doc.select(&sel("#dogears li")).count(), 1);
+        // pagination controls present: next link, but no prev link
+        assert!(doc
+            .select(&sel(".pagination-link.pagination-previous"))
+            .next()
+            .is_none());
+        let next = doc
+            .select(&sel(".pagination-link.pagination-next"))
+            .next()
+            .expect("must be present");
+        // next link goes to pg 2 w/ specified size
+        assert_eq!(next.attr("href").unwrap(), "/?page=2&size=1");
+    }
+    // pagination part 2
+    {
+        let req = new_req("GET", "/?page=2&size=1")
+            .session(&user.session_id)
+            .body(Body::empty())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        let body = body_bytes(resp).await;
+        let doc = Html::parse_document(bytes_str(&body));
+        // dogears list present, has #size items
+        assert_eq!(doc.select(&sel("#dogears li")).count(), 1);
+        // pagination controls present: prev link, but no next link
+        assert!(doc
+            .select(&sel(".pagination-link.pagination-next"))
+            .next()
+            .is_none());
+        let next = doc
+            .select(&sel(".pagination-link.pagination-previous"))
+            .next()
+            .expect("must be present");
+        // next link goes to pg 1 w/ specified size
+        assert_eq!(next.attr("href").unwrap(), "/?page=1&size=1");
     }
 }
