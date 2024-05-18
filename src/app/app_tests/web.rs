@@ -260,12 +260,22 @@ async fn account_and_tokens_test() {
     }
 }
 
+/// Helper type for testing the login and signup routes, since they use a
+/// different anti-csrf scheme that isn't tied to a user.
 struct SignedLoginCsrf {
     uuid: String,
     signature: String,
 }
 
 impl SignedLoginCsrf {
+    /// Fetch a page with the login form on it, and grab the login csrf cookie
+    async fn request(app: &mut axum::Router) -> Self {
+        let csrf_req = new_req("GET", "/").body(Body::empty()).unwrap();
+        let csrf_resp = do_req(app, csrf_req).await;
+        Self::from_resp(csrf_resp)
+    }
+
+    /// Grab the csrf cookie out of a response
     fn from_resp(resp: Response<Body>) -> Self {
         // grab first available cookie and crack it apart...
         // this is highly yolo maneuvering but whatever lol
@@ -323,15 +333,10 @@ async fn post_login_test() {
     };
 
     // Grab a signed csrf token from the login form Set-Cookie header
-    let valid_csrf = {
-        let csrf_req = new_req("GET", "/").body(Body::empty()).unwrap();
-        let csrf_resp = do_req(&mut app, csrf_req).await;
-        // grab first cookie and crack it apart... this is pretty yolo maneuvering but w/e.
-        SignedLoginCsrf::from_resp(csrf_resp)
-    };
+    let valid_csrf = SignedLoginCsrf::request(&mut app).await;
 
     // Okay!!!
-    // happy path: you get a session cookie and a default redirect to /.
+    // happy path: you get a session cookie and a redirect.
     {
         let req = new_req("POST", "/login")
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
@@ -383,6 +388,77 @@ async fn post_login_test() {
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .header(header::COOKIE, valid_csrf.to_cookie())
             .body(Body::from(form_body))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert!(resp.status().is_client_error()); // any 4xx
+    }
+}
+
+/// This is going to be mostly a copypasta of the login test, but the form is different
+/// enough that it didn't make sense to deduplicate.
+#[tokio::test]
+async fn post_signup_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    // no user this time!
+
+    // Grab a signed csrf token from the login form Set-Cookie header
+    let valid_csrf = SignedLoginCsrf::request(&mut app).await;
+
+    // happy path: sessid cookie and a redirect.
+    {
+        let form = format!("new_username=somebody&new_password=aaaaa&new_password_again=aaaaa&email=&login_csrf_token={}", &valid_csrf.uuid);
+        let req = new_req("POST", "/signup")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header(header::COOKIE, valid_csrf.to_cookie())
+            .body(Body::from(form))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        // got redirected
+        assert!(resp.status().is_redirection());
+        // to the expected location
+        let return_to = resp
+            .headers()
+            .get(header::LOCATION)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(
+            return_to.trim_start_matches(&state.config.public_url.origin().ascii_serialization()),
+            "/"
+        );
+        // got a sessid cookie
+        let found_sessid = resp
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .any(|val| val.to_str().unwrap().starts_with(COOKIE_SESSION));
+        assert!(found_sessid);
+    }
+
+    // We actually do have a case for 403-ing if you're signed in, but I'm
+    // simply not attached enough to it to add a test.
+
+    // Unhappy path: 400 if your csrf token doesn't match the cookie
+    {
+        let form = format!("new_username=somebody&new_password=aaaaa&new_password_again=aaaaa&email=&login_csrf_token={}", uuid_string());
+        let req = new_req("POST", "/signup")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header(header::COOKIE, valid_csrf.to_cookie())
+            .body(Body::from(form))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+    // Unhappy path: 4xx if you omit the csrf token completely
+    // TODO: the form params deserialization handles this, so it skips the nice error page.
+    // Maybe get around to wrapping the rejection one of these days.
+    {
+        let form = "new_username=somebody&new_password=aaaaa&new_password_again=aaaaa&email=";
+        let req = new_req("POST", "/signup")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header(header::COOKIE, valid_csrf.to_cookie())
+            .body(Body::from(form))
             .unwrap();
         let resp = do_req(&mut app, req).await;
         assert!(resp.status().is_client_error()); // any 4xx
