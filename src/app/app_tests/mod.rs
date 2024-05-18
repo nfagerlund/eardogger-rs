@@ -134,6 +134,20 @@ fn bytes_frag(b: &Bytes) -> Html {
     Html::parse_fragment(bytes_str(b))
 }
 
+/// Borrows a Bytes as HTML, but allowing late-binding decision
+/// of whether it's a full document or a fragment.
+fn bytes_html(b: &Bytes, kind: HtmlKind) -> Html {
+    match kind {
+        HtmlKind::Doc => bytes_doc(b),
+        HtmlKind::Frag => bytes_frag(b),
+    }
+}
+#[derive(Clone, Copy, Debug)]
+enum HtmlKind {
+    Doc,
+    Frag,
+}
+
 /// Consumes a response to return a RawJsonError (or not).
 async fn api_error_body(resp: Response<Body>) -> Result<RawJsonError, serde_json::Error> {
     let body = body_bytes(resp).await;

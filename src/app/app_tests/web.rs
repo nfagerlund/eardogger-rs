@@ -216,3 +216,80 @@ async fn faq_and_install_test() {
         }
     }
 }
+
+/// Very similar to index page, w/ the pagination.
+#[tokio::test]
+async fn account_and_tokens_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // Shared behaviors
+    for &(uri, kind) in &[
+        ("/account", HtmlKind::Doc),
+        ("/fragments/tokens", HtmlKind::Frag),
+    ] {
+        // Logged out: 401
+        {
+            let req = new_req("GET", uri).body(Body::empty()).unwrap();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        }
+        // Includes tokens list (hardcoded assumption: test user has 2.)
+        {
+            let req = new_req("GET", uri)
+                .session(&user.session_id)
+                .body(Body::empty())
+                .unwrap();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let html = bytes_html(&body, kind);
+            // It's a fragment OR a full page, depending
+            match kind {
+                HtmlKind::Doc => {
+                    assert!(has_logged_in_nav(&html));
+                    // also it's got various forms
+                    assert!(html.has("form#changepasswordform"));
+                    assert!(html.has("form#change_email_form"));
+                    assert!(html.has("form#delete_account_form"));
+                }
+                HtmlKind::Frag => {
+                    assert!(!has_logged_in_nav(&html));
+                }
+            }
+            // 2 tokens
+            let tokens = html.select(&sel("#tokens-list .token")).count();
+            assert_eq!(tokens, 2);
+        }
+        // Pagination
+        {
+            let with_query = format!("{}?size=1&page=2", uri);
+            let req = new_req("GET", with_query)
+                .session(&user.session_id)
+                .body(Body::empty())
+                .unwrap();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let html = bytes_html(&body, kind);
+            // Has #size items
+            let tokens = html.select(&sel("#tokens-list .token")).count();
+            assert_eq!(tokens, 1);
+            // Has no next link (we're on final page)
+            assert!(!html.has(".pagination-link.pagination-next"));
+            // Has prev link
+            let prev = html
+                .select(&sel(".pagination-link.pagination-previous"))
+                .next()
+                .expect("gotta have it");
+            // Links to account page w/ specified page size and #page - 1
+            assert_eq!(prev.attr("href").unwrap(), "/account?page=1&size=1");
+            // has equivalent fragment URL for js-nav
+            assert_eq!(
+                prev.attr("data-fragment-url").unwrap(),
+                "/fragments/tokens?page=1&size=1"
+            );
+        }
+    }
+}
