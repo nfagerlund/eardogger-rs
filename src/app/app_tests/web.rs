@@ -1,6 +1,8 @@
+use crate::util::{uuid_string, COOKIE_SESSION};
+
 use super::app_tests::*;
 
-// /public and /status
+/// /public and /status
 #[tokio::test]
 async fn app_basics_noauth_test() {
     let state = test_state().await;
@@ -24,16 +26,16 @@ async fn app_basics_noauth_test() {
     }
 }
 
+/// AuthSession extractor is properly hooked up: Providing a token is
+/// the same as not being logged in at all, for routes that take an
+/// AuthSession rather than an AuthAny. This is the only time I'll
+/// test this, other routes can just trust the type assurances.
 #[tokio::test]
 async fn token_isnt_logged_in() {
     let state = test_state().await;
     let mut app = eardogger_app(state.clone());
     let user = state.db.test_user("whoever").await.unwrap();
 
-    // AuthSession extractor is properly hooked up: Providing a token is
-    // the same as not being logged in at all, for routes that take an
-    // AuthSession rather than an AuthAny. This is the only time I'll
-    // test this, other routes can just trust the type assurances.
     {
         let req = new_req("GET", "/")
             .token(&user.manage_token)
@@ -255,5 +257,134 @@ async fn account_and_tokens_test() {
                 "/fragments/tokens?page=1&size=1"
             );
         }
+    }
+}
+
+struct SignedLoginCsrf {
+    uuid: String,
+    signature: String,
+}
+
+impl SignedLoginCsrf {
+    fn from_resp(resp: Response<Body>) -> Self {
+        // grab first available cookie and crack it apart...
+        // this is highly yolo maneuvering but whatever lol
+        let cookie_str = resp
+            .headers()
+            .get(header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        // We want the part after the first "=" but before the first ";".
+        let cookie_val = cookie_str
+            .split_once('=')
+            .unwrap()
+            .1
+            .split_once(';')
+            .unwrap()
+            .0;
+        // Then, there's another equals sign that seems to divide the signature
+        // and the UUID.
+        let (s, u) = cookie_val.split_once('=').unwrap();
+        Self {
+            uuid: u.to_string(),
+            signature: s.to_string(),
+        }
+    }
+
+    fn to_cookie(&self) -> String {
+        format!(
+            "{}={}={}",
+            crate::util::COOKIE_LOGIN_CSRF,
+            self.signature,
+            self.uuid
+        )
+    }
+
+    // ...and then form fields just get the plain uuid.
+}
+
+#[tokio::test]
+async fn post_login_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let _user = state.db.test_user("whoever").await.unwrap();
+
+    // quite a bit of nasty setup for this one.
+
+    // form-urlencoded for body
+    let form = |uuid: &str, return_to: &str| {
+        format!(
+            "username=whoever&password={}&login_csrf_token={}&return_to={}",
+            crate::db::Db::TEST_PASSWORD,
+            uuid,
+            return_to
+        )
+    };
+
+    // Grab a signed csrf token from the login form Set-Cookie header
+    let valid_csrf = {
+        let csrf_req = new_req("GET", "/").body(Body::empty()).unwrap();
+        let csrf_resp = do_req(&mut app, csrf_req).await;
+        // grab first cookie and crack it apart... this is pretty yolo maneuvering but w/e.
+        SignedLoginCsrf::from_resp(csrf_resp)
+    };
+
+    // Okay!!!
+    // happy path: you get a session cookie and a default redirect to /.
+    {
+        let req = new_req("POST", "/login")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header(header::COOKIE, valid_csrf.to_cookie())
+            .body(Body::from(form(&valid_csrf.uuid, "/")))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        // got redirected
+        assert!(resp.status().is_redirection());
+        // to the expected location
+        let return_to = resp
+            .headers()
+            .get(header::LOCATION)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(
+            return_to.trim_start_matches(&state.config.public_url.origin().ascii_serialization()),
+            "/"
+        );
+        // got a sessid cookie... need to use .any because we also send a
+        // removal cookie to waste the login csrf.
+        let found_sessid = resp
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .any(|val| val.to_str().unwrap().starts_with(COOKIE_SESSION));
+        assert!(found_sessid);
+    }
+
+    // Irrelevant path: Apparently we don't care if you're already logged in. :shrug:
+
+    // Unhappy path: 400 if your csrf token doesn't match the cookie
+    {
+        let req = new_req("POST", "/login")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header(header::COOKIE, valid_csrf.to_cookie())
+            .body(Body::from(form(&uuid_string(), "/")))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+    // Unhappy path: 4xx if you omit the csrf token completely
+    // TODO: the form params deserialization handles this, so it skips the nice error page.
+    // Maybe get around to wrapping the rejection one of these days.
+    {
+        let form_body = format!("username=whoever&password={}", crate::db::Db::TEST_PASSWORD);
+        let req = new_req("POST", "/login")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header(header::COOKIE, valid_csrf.to_cookie())
+            .body(Body::from(form_body))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert!(resp.status().is_client_error()); // any 4xx
     }
 }

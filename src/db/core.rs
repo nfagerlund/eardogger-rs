@@ -100,6 +100,9 @@ impl Db {
         self.task_tracker.reopen();
     }
 
+    #[cfg(test)]
+    pub const TEST_PASSWORD: &'static str = "aoeuhtns";
+
     /// Test helper. Create a new user with:
     /// - Provided name
     /// - Password "aoeuhtns"
@@ -114,7 +117,9 @@ impl Db {
             (self.users(), self.tokens(), self.sessions(), self.dogears());
         let email = format!("{}@example.com", name);
 
-        let user = users.create(name, "aoeuhtns", Some(&email)).await?;
+        let user = users
+            .create(name, Self::TEST_PASSWORD, Some(&email))
+            .await?;
         let (_, write_token) = tokens
             .create(
                 user.id,
