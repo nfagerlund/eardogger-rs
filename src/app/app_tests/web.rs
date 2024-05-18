@@ -25,6 +25,26 @@ async fn app_basics_noauth_test() {
 }
 
 #[tokio::test]
+async fn token_isnt_logged_in() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // AuthSession extractor is properly hooked up: Providing a token is
+    // the same as not being logged in at all, for routes that take an
+    // AuthSession rather than an AuthAny. This is the only time I'll
+    // test this, other routes can just trust the type assurances.
+    {
+        let req = new_req("GET", "/")
+            .token(&user.manage_token)
+            .body(Body::empty())
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_login_page(resp).await;
+    }
+}
+
+#[tokio::test]
 async fn index_test() {
     let state = test_state().await;
     let mut app = eardogger_app(state.clone());
@@ -33,17 +53,6 @@ async fn index_test() {
     // No login: serves login page
     {
         let req = new_req("GET", "/").body(Body::empty()).unwrap();
-        let resp = do_req(&mut app, req).await;
-        assert_login_page(resp).await;
-    }
-    // AuthSession extractor is properly hooked up: token is same as
-    // no login. This is the only time I'll test this, other routes can
-    // just trust the type assurances.
-    {
-        let req = new_req("GET", "/")
-            .token(&user.manage_token)
-            .body(Body::empty())
-            .unwrap();
         let resp = do_req(&mut app, req).await;
         assert_login_page(resp).await;
     }
@@ -56,11 +65,11 @@ async fn index_test() {
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_bytes(resp).await;
-        let doc = Html::parse_document(bytes_str(&body));
+        let doc = bytes_doc(&body);
         // Includes main layout content for a logged-in user:
         assert!(has_logged_in_nav(&doc));
         // includes "manual mode" form, for now
-        assert!(doc.select(&sel("form#update-dogear")).next().is_some());
+        assert!(doc.has("form#update-dogear"));
         // Includes dogears list with all dogears (assumption: test user has 2)
         assert_eq!(doc.select(&sel("#dogears li")).count(), 2);
     }
@@ -74,14 +83,11 @@ async fn index_test() {
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_bytes(resp).await;
-        let doc = Html::parse_document(bytes_str(&body));
+        let doc = bytes_doc(&body);
         // dogears list present, has #size items
         assert_eq!(doc.select(&sel("#dogears li")).count(), 1);
         // pagination controls present: next link, but no prev link
-        assert!(doc
-            .select(&sel(".pagination-link.pagination-previous"))
-            .next()
-            .is_none());
+        assert!(!doc.has(".pagination-link.pagination-previous"));
         let next = doc
             .select(&sel(".pagination-link.pagination-next"))
             .next()
@@ -102,14 +108,11 @@ async fn index_test() {
             .unwrap();
         let resp = do_req(&mut app, req).await;
         let body = body_bytes(resp).await;
-        let doc = Html::parse_document(bytes_str(&body));
+        let doc = bytes_doc(&body);
         // dogears list present, has #size items
         assert_eq!(doc.select(&sel("#dogears li")).count(), 1);
         // pagination controls present: prev link, but no next link
-        assert!(doc
-            .select(&sel(".pagination-link.pagination-next"))
-            .next()
-            .is_none());
+        assert!(!doc.has(".pagination-link.pagination-next"));
         let prev = doc
             .select(&sel(".pagination-link.pagination-previous"))
             .next()
@@ -147,7 +150,7 @@ async fn fragment_dogears_test() {
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_bytes(resp).await;
-        let frag = Html::parse_fragment(bytes_str(&body));
+        let frag = bytes_frag(&body);
         // There's NO nav and page frame, it's a fragment.
         assert!(!has_logged_in_nav(&frag));
         // Includes dogears list with all dogears (assumption: test user has 2)
@@ -163,14 +166,11 @@ async fn fragment_dogears_test() {
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_bytes(resp).await;
-        let frag = Html::parse_fragment(bytes_str(&body));
+        let frag = bytes_frag(&body);
         // dogears list present, has #size items
         assert_eq!(frag.select(&sel("#dogears li")).count(), 1);
         // pagination controls present: prev link, but no next link
-        assert!(frag
-            .select(&sel(".pagination-link.pagination-next"))
-            .next()
-            .is_none());
+        assert!(!frag.has(".pagination-link.pagination-next"));
         let prev = frag
             .select(&sel(".pagination-link.pagination-previous"))
             .next()

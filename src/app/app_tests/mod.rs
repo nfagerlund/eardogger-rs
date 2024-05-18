@@ -101,6 +101,17 @@ impl TestRequestBuilder for Builder {
     }
 }
 
+/// Convenience extension methods for scraper::Html.
+trait HasSelector {
+    fn has(&self, selector: &str) -> bool;
+}
+
+impl HasSelector for Html {
+    fn has(&self, selector: &str) -> bool {
+        self.select(&sel(selector)).next().is_some()
+    }
+}
+
 // TRANSFORMING FORMATS
 
 /// Consumes a response to return the body as a Bytes.
@@ -113,6 +124,16 @@ fn bytes_str(b: &Bytes) -> &str {
     std::str::from_utf8(b.as_ref()).unwrap()
 }
 
+/// Borrows a Bytes as an HTML document
+fn bytes_doc(b: &Bytes) -> Html {
+    Html::parse_document(bytes_str(b))
+}
+
+/// Borrows a Bytes as an HTML fragment
+fn bytes_frag(b: &Bytes) -> Html {
+    Html::parse_fragment(bytes_str(b))
+}
+
 /// Consumes a response to return a RawJsonError (or not).
 async fn api_error_body(resp: Response<Body>) -> Result<RawJsonError, serde_json::Error> {
     let body = body_bytes(resp).await;
@@ -123,7 +144,10 @@ async fn api_error_body(resp: Response<Body>) -> Result<RawJsonError, serde_json
 
 /// Consumes response. Panics unless it's status 200 and contains the login form.
 async fn assert_login_page(resp: Response<Body>) {
-    assert_page_and_contains(resp, r#"form action="/login""#).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_bytes(resp).await;
+    let doc = bytes_doc(&body);
+    assert!(has_login_form(&doc));
 }
 
 /// Consumes response. Panics unless it's status 200 and contains the
@@ -184,6 +208,10 @@ async fn assert_api_auth_required(
 
 /// Reports whether page has account link and logout form.
 fn has_logged_in_nav(doc: &Html) -> bool {
-    doc.select(&sel("nav a[href='/account']")).next().is_some()
-        && doc.select(&sel("form#logout")).next().is_some()
+    doc.has("nav a[href='/account']") && doc.has("form#logout")
+}
+
+/// Reports whether page is displaying the logit form.
+fn has_login_form(doc: &Html) -> bool {
+    doc.has(r#"form[action="/login"]"#)
 }
