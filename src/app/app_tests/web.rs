@@ -184,3 +184,35 @@ async fn fragment_dogears_test() {
         );
     }
 }
+
+/// These are just web pages.
+#[tokio::test]
+async fn faq_and_install_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    for &uri in &["/install", "/faq"] {
+        // Works logged-out
+        {
+            let req = new_req("GET", uri).body(Body::empty()).unwrap();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let doc = bytes_doc(&body);
+            assert!(!has_logged_in_nav(&doc));
+        }
+        // Works logged in
+        {
+            let req = new_req("GET", uri)
+                .session(&user.session_id)
+                .body(Body::empty())
+                .unwrap();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let doc = bytes_doc(&body);
+            assert!(has_logged_in_nav(&doc));
+        }
+    }
+}
