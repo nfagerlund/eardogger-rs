@@ -44,96 +44,20 @@ async fn token_isnt_logged_in() {
     }
 }
 
+/// Test the index (/) and /fragments/dogears, which have several similar behaviors.
 #[tokio::test]
-async fn index_test() {
+async fn index_and_dogears_test() {
     let state = test_state().await;
     let mut app = eardogger_app(state.clone());
     let user = state.db.test_user("whoever").await.unwrap();
 
-    // No login: serves login page
+    // No login: index serves login page
     {
         let req = new_req("GET", "/").body(Body::empty()).unwrap();
         let resp = do_req(&mut app, req).await;
         assert_login_page(resp).await;
     }
-    // Yes login: serves the dogears list.
-    {
-        let req = new_req("GET", "/")
-            .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
-        let resp = do_req(&mut app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = body_bytes(resp).await;
-        let doc = bytes_doc(&body);
-        // Includes main layout content for a logged-in user:
-        assert!(has_logged_in_nav(&doc));
-        // includes "manual mode" form, for now
-        assert!(doc.has("form#update-dogear"));
-        // Includes dogears list with all dogears (assumption: test user has 2)
-        assert_eq!(doc.select(&sel("#dogears li")).count(), 2);
-    }
-    // pagination.
-    // Assumption: test user has two dogears.
-    {
-        let req = new_req("GET", "/?size=1")
-            .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
-        let resp = do_req(&mut app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = body_bytes(resp).await;
-        let doc = bytes_doc(&body);
-        // dogears list present, has #size items
-        assert_eq!(doc.select(&sel("#dogears li")).count(), 1);
-        // pagination controls present: next link, but no prev link
-        assert!(!doc.has(".pagination-link.pagination-previous"));
-        let next = doc
-            .select(&sel(".pagination-link.pagination-next"))
-            .next()
-            .expect("must be present");
-        // next link goes to pg 2 w/ specified size
-        assert_eq!(next.attr("href").unwrap(), "/?page=2&size=1");
-        // has correct fragment URL for in-place swap
-        assert_eq!(
-            next.attr("data-fragment-url").unwrap(),
-            "/fragments/dogears?page=2&size=1"
-        );
-    }
-    // pagination part 2
-    {
-        let req = new_req("GET", "/?page=2&size=1")
-            .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
-        let resp = do_req(&mut app, req).await;
-        let body = body_bytes(resp).await;
-        let doc = bytes_doc(&body);
-        // dogears list present, has #size items
-        assert_eq!(doc.select(&sel("#dogears li")).count(), 1);
-        // pagination controls present: prev link, but no next link
-        assert!(!doc.has(".pagination-link.pagination-next"));
-        let prev = doc
-            .select(&sel(".pagination-link.pagination-previous"))
-            .next()
-            .expect("must be present");
-        // prev link goes to pg 1 w/ specified size
-        assert_eq!(prev.attr("href").unwrap(), "/?page=1&size=1");
-        // has correct fragment URL for in-place swap
-        assert_eq!(
-            prev.attr("data-fragment-url").unwrap(),
-            "/fragments/dogears?page=1&size=1"
-        );
-    }
-}
-
-#[tokio::test]
-async fn fragment_dogears_test() {
-    let state = test_state().await;
-    let mut app = eardogger_app(state.clone());
-    let user = state.db.test_user("whoever").await.unwrap();
-
-    // Logged out: 401
+    // No login: fragment serves 401
     {
         let req = new_req("GET", "/fragments/dogears")
             .body(Body::empty())
@@ -141,47 +65,87 @@ async fn fragment_dogears_test() {
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
-    // Logged in: like the main part of index page.
-    {
-        let req = new_req("GET", "/fragments/dogears")
-            .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
-        let resp = do_req(&mut app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = body_bytes(resp).await;
-        let frag = bytes_frag(&body);
-        // There's NO nav and page frame, it's a fragment.
-        assert!(!has_logged_in_nav(&frag));
-        // Includes dogears list with all dogears (assumption: test user has 2)
-        assert_eq!(frag.select(&sel("#dogears li")).count(), 2);
-    }
-    // Pagination: same as index
-    {
-        // page 2 size 1
-        let req = new_req("GET", "/fragments/dogears?page=2&size=1")
-            .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
-        let resp = do_req(&mut app, req).await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = body_bytes(resp).await;
-        let frag = bytes_frag(&body);
-        // dogears list present, has #size items
-        assert_eq!(frag.select(&sel("#dogears li")).count(), 1);
-        // pagination controls present: prev link, but no next link
-        assert!(!frag.has(".pagination-link.pagination-next"));
-        let prev = frag
-            .select(&sel(".pagination-link.pagination-previous"))
-            .next()
-            .expect("must be present");
-        // prev link goes to pg 1 w/ specified size
-        assert_eq!(prev.attr("href").unwrap(), "/?page=1&size=1");
-        // has correct fragment URL for in-place swap
-        assert_eq!(
-            prev.attr("data-fragment-url").unwrap(),
-            "/fragments/dogears?page=1&size=1"
-        );
+    // Shared behaviors
+    for &(uri, kind) in &[("/", HtmlKind::Doc), ("/fragments/dogears", HtmlKind::Frag)] {
+        // Serves the dogears list.
+        {
+            let req = new_req("GET", uri)
+                .session(&user.session_id)
+                .body(Body::empty())
+                .unwrap();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let html = bytes_html(&body, kind);
+            // It's either a fragment or a whole page:
+            match kind {
+                HtmlKind::Doc => {
+                    // Includes main layout content for a logged-in user:
+                    assert!(has_logged_in_nav(&html));
+                    // includes "manual mode" form, for now
+                    assert!(html.has("form#update-dogear"));
+                }
+                HtmlKind::Frag => {
+                    // No page frame
+                    assert!(!has_logged_in_nav(&html));
+                }
+            }
+            // Includes dogears list with all dogears (assumption: test user has 2)
+            assert_eq!(html.select(&sel("#dogears li")).count(), 2);
+        }
+        // pagination. Assumption: test user has two dogears.
+        {
+            let with_q = format!("{}?size=1", uri);
+            let req = new_req("GET", &with_q)
+                .session(&user.session_id)
+                .body(Body::empty())
+                .unwrap();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let html = bytes_html(&body, kind);
+            // dogears list present, has #size items
+            assert_eq!(html.select(&sel("#dogears li")).count(), 1);
+            // pagination controls present: next link, but no prev link
+            assert!(!html.has(".pagination-link.pagination-previous"));
+            let next = html
+                .select(&sel(".pagination-link.pagination-next"))
+                .next()
+                .expect("must be present");
+            // next link goes to pg 2 w/ specified size
+            assert_eq!(next.attr("href").unwrap(), "/?page=2&size=1");
+            // has correct fragment URL for in-place swap
+            assert_eq!(
+                next.attr("data-fragment-url").unwrap(),
+                "/fragments/dogears?page=2&size=1"
+            );
+        }
+        // pagination part 2
+        {
+            let with_q = format!("{}?page=2&size=1", uri);
+            let req = new_req("GET", &with_q)
+                .session(&user.session_id)
+                .body(Body::empty())
+                .unwrap();
+            let resp = do_req(&mut app, req).await;
+            let body = body_bytes(resp).await;
+            let html = bytes_html(&body, kind);
+            // dogears list present, has #size items
+            assert_eq!(html.select(&sel("#dogears li")).count(), 1);
+            // pagination controls present: prev link, but no next link
+            assert!(!html.has(".pagination-link.pagination-next"));
+            let prev = html
+                .select(&sel(".pagination-link.pagination-previous"))
+                .next()
+                .expect("must be present");
+            // prev link goes to pg 1 w/ specified size
+            assert_eq!(prev.attr("href").unwrap(), "/?page=1&size=1");
+            // has correct fragment URL for in-place swap
+            assert_eq!(
+                prev.attr("data-fragment-url").unwrap(),
+                "/fragments/dogears?page=1&size=1"
+            );
+        }
     }
 }
 
