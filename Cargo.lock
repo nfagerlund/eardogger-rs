@@ -239,7 +239,7 @@ dependencies = [
 [[package]]
 name = "busride-rs"
 version = "0.1.0"
-source = "git+https://github.com/nfagerlund/busride-rs?rev=ce669be#ce669be46dfeea5bd6169ae79ae6cba4ff1be9e9"
+source = "git+https://github.com/nfagerlund/busride-rs?rev=dd2f88f#dd2f88fb97f7c86ebad8781eb5667d279caef799"
 dependencies = [
  "axum",
  "bytes",
