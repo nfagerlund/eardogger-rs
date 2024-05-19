@@ -250,6 +250,7 @@ async fn mark_url_page_test() {
             .session(&user.session_id)
             .empty();
         let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
         let body = body_bytes(resp).await;
         let doc = bytes_doc(&body);
         // it's the marked page
@@ -264,11 +265,50 @@ async fn mark_url_page_test() {
             .session(&user.session_id)
             .empty();
         let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
         let body = body_bytes(resp).await;
         let doc = bytes_doc(&body);
         // it's the create page
         assert!(doc.has("form#create-dogear"));
         assert!(!doc.has("#mark-success"));
+    }
+}
+
+/// Like the mark page, the resume page can be two different things:
+/// if you've got a dogear for the URL, it boots your ass out the door,
+/// and if not it shows the create page.
+#[tokio::test]
+async fn resume_url_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // hardcoded assumption: we're on page 24 of the example comic.
+    {
+        let req = new_req("GET", "/resume/https%3A%2F%2Fexample.com%2Fcomic%2F10")
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        assert!(resp.status().is_redirection());
+        let dest = resp
+            .headers()
+            .get(header::LOCATION)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(dest, "https://example.com/comic/24");
+    }
+    // New site: shows create page
+    {
+        let req = new_req("GET", "/resume/https%3A%2F%2Fexample.com%2Fmanual%2F6")
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        // it's the create page
+        assert!(doc.has("form#create-dogear"));
     }
 }
 
