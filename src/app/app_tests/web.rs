@@ -852,6 +852,41 @@ async fn delete_token_test() {
     }
 }
 
+/// This behaves a lot like delete token.
+#[tokio::test]
+async fn delete_session_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // btw: DELETEs aren't plain posts, so they're not CSRF-vulnerable.
+    // Let's make a new session, instead of just grabbing my one-and-only out the db.
+    let u_again = state.db.users().by_name("whoever").await.unwrap().unwrap();
+    let sess = state
+        .db
+        .sessions()
+        .create(u_again.id, Some("fiery foqs"))
+        .await
+        .unwrap();
+
+    // 404 on whiff
+    {
+        let req = new_req("DELETE", "/sessions/999")
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+    // 204 on hit
+    {
+        let req = new_req("DELETE", format!("/sessions/{}", sess.external_id))
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    }
+}
+
 /// This is a bit odd because it's a "plain" POST request, but the body
 /// is empty and the csrf token comes in via query param. This is because
 /// it's coming in via the fragment-replacer javascript. I might consider
