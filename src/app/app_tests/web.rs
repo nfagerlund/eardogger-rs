@@ -235,6 +235,43 @@ async fn account_and_tokens_test() {
     }
 }
 
+/// /mark/:url page displays one of two underlying pages: the "marked"
+/// page if the URL matches an existing dogear, or the "create" page
+/// if it doesn't.
+#[tokio::test]
+async fn mark_url_page_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // Matching existing dogear: shows marked page in slow mode
+    {
+        let req = new_req("GET", "/mark/https%3A%2F%2Fexample.com%2Fcomic%2F25")
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        // it's the marked page
+        assert!(doc.has("#mark-success"));
+        assert!(!doc.has("form#create-dogear"));
+        // and it's in slow-mode
+        assert!(doc.has("#slow-mode"));
+    }
+    // New site: shows create page
+    {
+        let req = new_req("GET", "/mark/https%3A%2F%2Fexample.com%2Fmanual%2F6")
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        // it's the create page
+        assert!(doc.has("form#create-dogear"));
+        assert!(!doc.has("#mark-success"));
+    }
+}
+
 /// Helper type for testing the login and signup routes, since they use a
 /// different anti-csrf scheme that isn't tied to a user.
 struct SignedLoginCsrf {

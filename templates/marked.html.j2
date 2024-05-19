@@ -3,8 +3,8 @@
 {% extends "_layout.html.j2" %}
 {% block body %}
 <section id="mark-success">
-  {% if marked_page.slow_mode %}
-    <div class="cartouche">
+  {% if marked_page.slowmode %}
+    <div id="slow-mode" class="cartouche">
       <h2>Slow Mode</h2>
       <h3>Re-generate your bookmarklet to save faster!</h3>
     </div>
