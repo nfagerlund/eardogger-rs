@@ -514,7 +514,7 @@ pub async fn post_login(
         .authenticate(&params.username, &params.password)
         .await?
     {
-        let session = state.db.sessions().create(user.id).await?;
+        let session = state.db.sessions().create(user.id, None).await?;
         cookies.add(session.into_cookie());
     }
 
@@ -586,7 +586,7 @@ pub async fn post_signup(
             params.email.as_deref(),
         )
         .await?;
-    let session = state.db.sessions().create(user.id).await?;
+    let session = state.db.sessions().create(user.id, None).await?;
     cookies.add(session.into_cookie());
     Ok(Redirect::to("/"))
 }

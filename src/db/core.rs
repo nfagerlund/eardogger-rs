@@ -134,7 +134,7 @@ impl Db {
                 Some("manage token for test user"),
             )
             .await?;
-        let session = sessions.create(user.id).await?;
+        let session = sessions.create(user.id, None).await?;
         dogears
             .create(
                 user.id,

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                INSERT INTO sessions (id, user_id, csrf_token, expires)\n                VALUES (?1, ?2, ?3, datetime(?4))\n                RETURNING id, user_id, csrf_token, expires, user_agent;\n            ",
+  "query": "\n                SELECT id, user_id, csrf_token, expires, user_agent\n                FROM sessions\n                WHERE user_id = ?1\n                ORDER BY expires DESC, id DESC\n                LIMIT ?2\n                OFFSET ?3;\n            ",
   "describe": {
     "columns": [
       {
@@ -30,7 +30,7 @@
       }
     ],
     "parameters": {
-      "Right": 4
+      "Right": 3
     },
     "nullable": [
       false,
@@ -40,5 +40,5 @@
       true
     ]
   },
-  "hash": "8cfaf4fdadb6b4ad316ba4b77f2e471d4edcdc7d003de65186d078cde60e63b6"
+  "hash": "aa5a1ecb87b46ce6c0e7e7a56ac598fb7c2aa0455fc271430a5d935f013313b4"
 }

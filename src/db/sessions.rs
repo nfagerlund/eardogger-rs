@@ -1,6 +1,7 @@
 use super::{core::Db, users::User};
+use crate::util::{sqlite_offset, ListMeta, MixedError};
 use crate::util::{uuid_string, COOKIE_SESSION};
-use sqlx::{query, query_as, SqlitePool};
+use sqlx::{query, query_as, query_scalar, SqlitePool};
 use time::Duration;
 use time::OffsetDateTime;
 use tower_cookies::cookie::{Cookie, SameSite};
@@ -85,22 +86,22 @@ impl<'a> Sessions<'a> {
 
     /// Make a new user login session
     #[tracing::instrument(skip(self))]
-    pub async fn create(&self, user_id: i64) -> sqlx::Result<Session> {
+    pub async fn create(&self, user_id: i64, user_agent: Option<&str>) -> sqlx::Result<Session> {
         let sessid = uuid_string();
         let csrf_token = uuid_string();
         let new_expires = OffsetDateTime::now_utc() + Duration::days(SESSION_LIFETIME_DAYS);
-        // ^^ theoretically I could stack-allocate that but ehhhh
         query_as!(
             Session,
             r#"
-                INSERT INTO sessions (id, user_id, csrf_token, expires)
-                VALUES (?1, ?2, ?3, datetime(?4))
+                INSERT INTO sessions (id, user_id, csrf_token, expires, user_agent)
+                VALUES (?1, ?2, ?3, datetime(?4), ?5)
                 RETURNING id, user_id, csrf_token, expires, user_agent;
             "#,
             sessid,
             user_id,
             csrf_token,
             new_expires,
+            user_agent,
         )
         .fetch_one(self.write_pool())
         .await
@@ -198,5 +199,55 @@ impl<'a> Sessions<'a> {
             user_agent: stuff.session_user_agent,
         };
         Ok(Some((session, user)))
+    }
+
+    /// List all sessions for a user, so they can log out of a forgotten session remotely.
+    #[tracing::instrument(skip_all)]
+    pub async fn list(
+        &self,
+        user_id: i64,
+        page: u32,
+        size: u32,
+    ) -> Result<(Vec<Session>, ListMeta), MixedError<sqlx::Error>> {
+        // Do multiple reads in a transaction, so count and list see the
+        // same causal slice.
+        let mut tx = self.read_pool().begin().await?;
+
+        // Get count first, as a separate query. For some reason sqlx tries
+        // by default to return the value of COUNT() as an i32, which I
+        // KNOW is not correct, so that column name with a colon overrides it
+        // at the sqlx layer.
+        let count = query_scalar!(
+            r#"
+                SELECT COUNT(id) AS 'count: u32' FROM sessions WHERE user_id = ?;
+            "#,
+            user_id,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let meta = ListMeta { count, page, size };
+
+        let offset = sqlite_offset(page, size)?;
+        let list = query_as!(
+            Session,
+            r#"
+                SELECT id, user_id, csrf_token, expires, user_agent
+                FROM sessions
+                WHERE user_id = ?1
+                ORDER BY expires DESC, id DESC
+                LIMIT ?2
+                OFFSET ?3;
+            "#,
+            user_id,
+            size,
+            offset,
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok((list, meta))
     }
 }

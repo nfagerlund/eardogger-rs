@@ -35,7 +35,7 @@ async fn cascading_delete() {
     let (token_list, _meta) = tokens.list(user1.id, 1, 50).await.unwrap();
     assert_eq!(token_list.len(), 1);
     // create session, check existence
-    let session1 = sessions.create(user1.id).await.unwrap();
+    let session1 = sessions.create(user1.id, None).await.unwrap();
     assert!(sessions.authenticate(&session1.id).await.unwrap().is_some());
     // create dogear, check existence
     let _ = dogears
@@ -83,7 +83,7 @@ async fn session_lifetime_modifier() {
         .expect("failed user creation");
     let session = db
         .sessions()
-        .create(session_user.id)
+        .create(session_user.id, None)
         .await
         .expect("failed to get session");
     // make sure time crate + sqlx is doing what we expect.
