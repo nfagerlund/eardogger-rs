@@ -2,6 +2,8 @@ use crate::util::{uuid_string, COOKIE_SESSION};
 
 use super::app_tests::*;
 
+const TEST_PASSWORD: &str = crate::db::Db::TEST_PASSWORD;
+
 /// /public and /status
 #[tokio::test]
 async fn app_basics_noauth_test() {
@@ -378,9 +380,7 @@ async fn post_login_test() {
     let form = |uuid: &str, return_to: &str| {
         format!(
             "username=whoever&password={}&login_csrf_token={}&return_to={}",
-            crate::db::Db::TEST_PASSWORD,
-            uuid,
-            return_to
+            TEST_PASSWORD, uuid, return_to
         )
     };
 
@@ -435,7 +435,7 @@ async fn post_login_test() {
     // TODO: the form params deserialization handles this, so it skips the nice error page.
     // Maybe get around to wrapping the rejection one of these days.
     {
-        let form_body = format!("username=whoever&password={}", crate::db::Db::TEST_PASSWORD);
+        let form_body = format!("username=whoever&password={}", TEST_PASSWORD);
         let req = new_req("POST", "/login")
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .header(header::COOKIE, valid_csrf.to_cookie())
@@ -588,5 +588,111 @@ async fn post_logout_test() {
                     false
                 });
         assert!(got_empty_sessid_cookie);
+    }
+}
+
+#[tokio::test]
+async fn post_change_password_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    let form = |old: &str, new: &str, again: &str| {
+        format!(
+            "password={}&new_password={}&new_password_again={}&csrf_token={}",
+            old, new, again, &user.csrf_token
+        )
+    };
+
+    // csrf guard
+    {
+        let form = format!(
+            "password={}&new_password={1}&new_password_again={1}",
+            TEST_PASSWORD, "snthsnth"
+        );
+        reusable_csrf_guard_test(&mut app, "/changepassword", &form, &user.session_id).await;
+    }
+    // wrong password
+    {
+        let req = new_req("POST", "/changepassword")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form("blah", "snth", "snth")))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        assert!(doc.has("#error-page"));
+    }
+    // mismatched new passwords
+    {
+        let req = new_req("POST", "/changepassword")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form(TEST_PASSWORD, "snth", "htns")))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        assert!(doc.has("#error-page"));
+    }
+    // happy path
+    {
+        let req = new_req("POST", "/changepassword")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form(TEST_PASSWORD, "snth", "snth")))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        // is redirect, don't really care where
+        assert!(resp.status().is_redirection());
+    }
+}
+
+#[tokio::test]
+async fn post_change_email_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    let form = |pw: &str, email: &str| {
+        format!(
+            "password={}&new_email={}&csrf_token={}",
+            pw, email, &user.csrf_token
+        )
+    };
+    // csrf guard
+    {
+        let form = format!(
+            "password={}&new_email={}",
+            TEST_PASSWORD, "whenever@example.com"
+        );
+        reusable_csrf_guard_test(&mut app, "/change_email", &form, &user.session_id).await;
+    }
+    // 400 on bad password
+    {
+        let req = new_req("POST", "/change_email")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form("uehtoans", "whenever@example.com")))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        assert!(doc.has("#error-page"));
+    }
+    // happy path: redirect
+    {
+        let req = new_req("POST", "/change_email")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form(TEST_PASSWORD, "whenever@example.com")))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        // don't really care where
+        assert!(resp.status().is_redirection());
     }
 }
