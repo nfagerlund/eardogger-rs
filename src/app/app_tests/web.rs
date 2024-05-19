@@ -10,9 +10,7 @@ async fn app_basics_noauth_test() {
 
     // Static file serving is hooked up right
     {
-        let req = new_req("GET", "/public/style.css")
-            .body(Body::empty())
-            .unwrap();
+        let req = new_req("GET", "/public/style.css").empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_page_and_contains(resp, "--color-background").await;
@@ -20,7 +18,7 @@ async fn app_basics_noauth_test() {
 
     // Status is hooked up right
     {
-        let req = new_req("GET", "/status").body(Body::empty()).unwrap();
+        let req = new_req("GET", "/status").empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
     }
@@ -37,10 +35,7 @@ async fn token_isnt_logged_in() {
     let user = state.db.test_user("whoever").await.unwrap();
 
     {
-        let req = new_req("GET", "/")
-            .token(&user.manage_token)
-            .body(Body::empty())
-            .unwrap();
+        let req = new_req("GET", "/").token(&user.manage_token).empty();
         let resp = do_req(&mut app, req).await;
         assert_login_page(resp).await;
     }
@@ -55,15 +50,13 @@ async fn index_and_dogears_test() {
 
     // No login: index serves login page
     {
-        let req = new_req("GET", "/").body(Body::empty()).unwrap();
+        let req = new_req("GET", "/").empty();
         let resp = do_req(&mut app, req).await;
         assert_login_page(resp).await;
     }
     // No login: fragment serves 401
     {
-        let req = new_req("GET", "/fragments/dogears")
-            .body(Body::empty())
-            .unwrap();
+        let req = new_req("GET", "/fragments/dogears").empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
@@ -71,10 +64,7 @@ async fn index_and_dogears_test() {
     for &(uri, kind) in &[("/", HtmlKind::Doc), ("/fragments/dogears", HtmlKind::Frag)] {
         // Serves the dogears list.
         {
-            let req = new_req("GET", uri)
-                .session(&user.session_id)
-                .body(Body::empty())
-                .unwrap();
+            let req = new_req("GET", uri).session(&user.session_id).empty();
             let resp = do_req(&mut app, req).await;
             assert_eq!(resp.status(), StatusCode::OK);
             let body = body_bytes(resp).await;
@@ -98,10 +88,7 @@ async fn index_and_dogears_test() {
         // pagination. Assumption: test user has two dogears.
         {
             let with_q = format!("{}?size=1", uri);
-            let req = new_req("GET", &with_q)
-                .session(&user.session_id)
-                .body(Body::empty())
-                .unwrap();
+            let req = new_req("GET", &with_q).session(&user.session_id).empty();
             let resp = do_req(&mut app, req).await;
             assert_eq!(resp.status(), StatusCode::OK);
             let body = body_bytes(resp).await;
@@ -125,10 +112,7 @@ async fn index_and_dogears_test() {
         // pagination part 2
         {
             let with_q = format!("{}?page=2&size=1", uri);
-            let req = new_req("GET", &with_q)
-                .session(&user.session_id)
-                .body(Body::empty())
-                .unwrap();
+            let req = new_req("GET", &with_q).session(&user.session_id).empty();
             let resp = do_req(&mut app, req).await;
             let body = body_bytes(resp).await;
             let html = bytes_html(&body, kind);
@@ -161,7 +145,7 @@ async fn faq_and_install_test() {
     for &uri in &["/install", "/faq"] {
         // Works logged-out
         {
-            let req = new_req("GET", uri).body(Body::empty()).unwrap();
+            let req = new_req("GET", uri).empty();
             let resp = do_req(&mut app, req).await;
             assert_eq!(resp.status(), StatusCode::OK);
             let body = body_bytes(resp).await;
@@ -170,10 +154,7 @@ async fn faq_and_install_test() {
         }
         // Works logged in
         {
-            let req = new_req("GET", uri)
-                .session(&user.session_id)
-                .body(Body::empty())
-                .unwrap();
+            let req = new_req("GET", uri).session(&user.session_id).empty();
             let resp = do_req(&mut app, req).await;
             assert_eq!(resp.status(), StatusCode::OK);
             let body = body_bytes(resp).await;
@@ -197,16 +178,13 @@ async fn account_and_tokens_test() {
     ] {
         // Logged out: 401
         {
-            let req = new_req("GET", uri).body(Body::empty()).unwrap();
+            let req = new_req("GET", uri).empty();
             let resp = do_req(&mut app, req).await;
             assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         }
         // Includes tokens list (hardcoded assumption: test user has 2.)
         {
-            let req = new_req("GET", uri)
-                .session(&user.session_id)
-                .body(Body::empty())
-                .unwrap();
+            let req = new_req("GET", uri).session(&user.session_id).empty();
             let resp = do_req(&mut app, req).await;
             assert_eq!(resp.status(), StatusCode::OK);
             let body = body_bytes(resp).await;
@@ -231,10 +209,7 @@ async fn account_and_tokens_test() {
         // Pagination
         {
             let with_query = format!("{}?size=1&page=2", uri);
-            let req = new_req("GET", with_query)
-                .session(&user.session_id)
-                .body(Body::empty())
-                .unwrap();
+            let req = new_req("GET", with_query).session(&user.session_id).empty();
             let resp = do_req(&mut app, req).await;
             assert_eq!(resp.status(), StatusCode::OK);
             let body = body_bytes(resp).await;
@@ -270,7 +245,7 @@ struct SignedLoginCsrf {
 impl SignedLoginCsrf {
     /// Fetch a page with the login form on it, and grab the login csrf cookie
     async fn request(app: &mut axum::Router) -> Self {
-        let csrf_req = new_req("GET", "/").body(Body::empty()).unwrap();
+        let csrf_req = new_req("GET", "/").empty();
         let csrf_resp = do_req(app, csrf_req).await;
         Self::from_resp(csrf_resp)
     }

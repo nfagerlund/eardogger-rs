@@ -15,8 +15,7 @@ async fn api_list_test() {
         let req = new_req("OPTIONS", "/api/v1/list")
             .json()
             .header(header::ORIGIN, "https://example.com")
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_no_cors(&resp);
 
@@ -25,8 +24,7 @@ async fn api_list_test() {
             .json()
             .header(header::ORIGIN, "https://example.com")
             .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_no_cors(&resp);
     }
@@ -39,8 +37,7 @@ async fn api_list_test() {
         let req = new_req("GET", "/api/v1/list")
             .json()
             .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
@@ -55,8 +52,7 @@ async fn api_list_test() {
         let req = new_req("GET", "/api/v1/list")
             .json()
             .token(&user.manage_token)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
@@ -71,8 +67,7 @@ async fn api_list_test() {
         let req = new_req("GET", "/api/v1/list")
             .json()
             .token(&user.write_token)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_api_insufficient_permissions(resp).await;
     }
@@ -81,8 +76,7 @@ async fn api_list_test() {
         let req = new_req("GET", "/api/v1/list?page=1&size=50000")
             .json()
             .token(&user.manage_token)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         let _ = api_error_body(resp).await;
@@ -92,8 +86,7 @@ async fn api_list_test() {
         let req = new_req("GET", "/api/v1/list?page=2&size=1")
             .json()
             .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let body_bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
@@ -131,8 +124,7 @@ async fn api_delete_test() {
         let req = new_req("OPTIONS", &delete_0)
             .json()
             .header(header::ORIGIN, "https://example.com")
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_no_cors(&resp);
     }
@@ -145,8 +137,7 @@ async fn api_delete_test() {
         let req = new_req("DELETE", &delete_0)
             .json()
             .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
     }
@@ -155,8 +146,7 @@ async fn api_delete_test() {
         let req = new_req("DELETE", &delete_0) // Second time using this URL, so it's dead
             .json()
             .session(&user.session_id)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
@@ -166,8 +156,7 @@ async fn api_delete_test() {
             .method("DELETE")
             .json()
             .token(&user.write_token)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_api_insufficient_permissions(resp).await;
     }
@@ -176,8 +165,7 @@ async fn api_delete_test() {
         let req = new_req("DELETE", &delete_1)
             .json()
             .token(&user.manage_token)
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let resp = do_req(&mut app, req).await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
     }
@@ -335,8 +323,7 @@ async fn api_update_test() {
         let opt_req = new_req("OPTIONS", uri)
             .json()
             .header(header::ORIGIN, "http://example.com")
-            .body(Body::empty())
-            .unwrap();
+            .empty();
         let opt = do_req(&mut app, opt_req).await;
         // u can post
         assert_eq!(

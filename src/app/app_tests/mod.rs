@@ -80,6 +80,8 @@ trait TestRequestBuilder {
     fn auth(self, auth: Auth) -> Self;
     /// Sets accept + content-type json.
     fn json(self) -> Self;
+    /// Sets an empty body and finalizes the request.
+    fn empty(self) -> Request<Body>;
 }
 
 impl TestRequestBuilder for Builder {
@@ -98,6 +100,9 @@ impl TestRequestBuilder for Builder {
     fn json(self) -> Self {
         self.header(header::ACCEPT, "application/json")
             .header(header::CONTENT_TYPE, "application/json")
+    }
+    fn empty(self) -> Request<Body> {
+        self.body(Body::empty()).unwrap()
     }
 }
 
