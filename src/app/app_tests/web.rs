@@ -1,4 +1,4 @@
-use crate::util::{uuid_string, COOKIE_SESSION};
+use crate::util::{uuid_string, COOKIE_SESSION, DELETE_ACCOUNT_CONFIRM_STRING};
 
 use super::app_tests::*;
 
@@ -693,6 +693,68 @@ async fn post_change_email_test() {
             .unwrap();
         let resp = do_req(&mut app, req).await;
         // don't really care where
+        assert!(resp.status().is_redirection());
+    }
+}
+
+#[tokio::test]
+async fn post_delete_account_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    let form = |pw: &str, please: &str| {
+        format!(
+            "password={}&confirm_delete_account={}&csrf_token={}",
+            pw, please, &user.csrf_token
+        )
+    };
+    // csrf guard
+    {
+        let form = format!(
+            "password={}&confirm_delete_account={}",
+            TEST_PASSWORD, DELETE_ACCOUNT_CONFIRM_STRING
+        );
+        reusable_csrf_guard_test(&mut app, "/delete_account", &form, &user.session_id).await;
+    }
+    // 400 on bad password
+    {
+        let req = new_req("POST", "/delete_account")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form("uehtoans", DELETE_ACCOUNT_CONFIRM_STRING)))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        assert!(doc.has("#error-page"));
+    }
+    // 400 on bad confirm string
+    {
+        let req = new_req("POST", "/delete_account")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form(TEST_PASSWORD, "dewete my account uwu")))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        assert!(doc.has("#error-page"));
+    }
+    // happy path: die
+    {
+        let req = new_req("POST", "/delete_account")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form(
+                TEST_PASSWORD,
+                DELETE_ACCOUNT_CONFIRM_STRING,
+            )))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        // don't care where
         assert!(resp.status().is_redirection());
     }
 }

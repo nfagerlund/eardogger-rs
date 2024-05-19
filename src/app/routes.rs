@@ -5,7 +5,8 @@ use super::web_result::{ApiError, ApiResult, WebError, WebResult};
 use crate::db::{Dogear, TokenScope};
 use crate::util::{
     check_new_password, clean_optional_form_field, uuid_string, ListMeta, Pagination, UserError,
-    COOKIE_LOGIN_CSRF, COOKIE_SESSION, PAGE_DEFAULT_SIZE, SHORT_DATE,
+    COOKIE_LOGIN_CSRF, COOKIE_SESSION, DELETE_ACCOUNT_CONFIRM_STRING, PAGE_DEFAULT_SIZE,
+    SHORT_DATE,
 };
 
 use axum::extract::Path;
@@ -403,8 +404,6 @@ pub struct DeleteAccountParams {
     confirm_delete_account: String,
     csrf_token: String,
 }
-
-const DELETE_ACCOUNT_CONFIRM_STRING: &str = "delete my account";
 
 /// The delete account form, on the account page. It's kind of like the Final Logout.
 #[tracing::instrument(skip_all)]

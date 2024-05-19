@@ -26,6 +26,7 @@ pub const COOKIE_SESSION: &str = "eardogger.sessid";
 pub const COOKIE_LOGIN_CSRF: &str = "eardogger.loginguard";
 pub const PAGE_DEFAULT_SIZE: u32 = 50;
 const PAGE_MAX_SIZE: u32 = 500;
+pub const DELETE_ACCOUNT_CONFIRM_STRING: &str = "delete my account";
 
 /// Use the thread_rng CSPRNG to create a random UUID, formatted as a String.
 /// This ought to be mildly more efficient than hammering the OS random source.
