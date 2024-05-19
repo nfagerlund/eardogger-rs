@@ -204,12 +204,14 @@ form#logout {
 /* Grid for dogear items */
 
 #dogears,
-#tokens-list {
+#tokens-list,
+#sessions-list {
   padding-left: 0;
 }
 
 #dogears li,
-.token {
+.token,
+.session {
   list-style: none;
   display: grid;
   grid-row-gap: 5px;
@@ -285,7 +287,8 @@ form#logout {
 #dogears .date,
 .token-scope,
 .token-created,
-.token-last-used {
+.token-last-used,
+.session-expires {
   font-size: smaller;
   font-family: var(--font-text);
   color: var(--color-disabled);
@@ -293,7 +296,7 @@ form#logout {
 
 .token {
   grid-template-columns: 1fr 1fr 1fr auto;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   grid-template-areas:
     "comment comment comment delete"
     "last last created created"
@@ -316,6 +319,27 @@ form#logout {
 }
 .token-last-used {
   grid-area: last;
+}
+
+.session {
+  grid-template-columns: 1fr 1fr auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "agent agent delete"
+    "expires expires expires";
+}
+.session-user-agent {
+  grid-area: agent;
+  justify-self: start;
+}
+.session-expires {
+  grid-area: expires;
+  justify-self: start;
+}
+.session-delete,
+.session-current {
+  grid-area: delete;
+  align-self: center;
 }
 
 .columns {
