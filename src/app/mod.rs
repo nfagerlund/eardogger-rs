@@ -59,6 +59,8 @@ pub fn eardogger_app(state: DogState) -> Router {
             ServeDir::new(&state.config.assets_dir).not_found_service(four_oh_four.into_service()),
         )
         .route("/status", get(status))
+        .route("/favicon.ico", get(status))
+        .route("/favicon.gif", get(status))
         .fallback(four_oh_four)
         .with_state(state)
 }
