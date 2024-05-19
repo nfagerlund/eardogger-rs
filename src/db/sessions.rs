@@ -1,9 +1,9 @@
 use super::{core::Db, users::User};
 use crate::util::{sqlite_offset, ListMeta, MixedError};
 use crate::util::{uuid_string, COOKIE_SESSION};
+use serde::Serialize;
 use sqlx::{query, query_as, query_scalar, SqlitePool};
-use time::Duration;
-use time::OffsetDateTime;
+use time::{serde::iso8601, Duration, OffsetDateTime};
 use tower_cookies::cookie::{Cookie, SameSite};
 use tracing::error;
 
@@ -19,7 +19,7 @@ pub struct Sessions<'a> {
 }
 
 /// A record struct for user login sessions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Session {
     /// An integer ID that allows referencing the session without knowing its
     /// random ID string. Only really used for remote logouts.
@@ -36,6 +36,7 @@ pub struct Session {
     /// scheme involving signed cookies. For more info, see:
     /// <https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html>
     pub csrf_token: String,
+    #[serde(with = "iso8601")]
     pub expires: OffsetDateTime,
     pub user_agent: Option<String>,
 }

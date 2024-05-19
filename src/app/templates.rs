@@ -1,5 +1,5 @@
 use crate::{
-    db::{Dogear, Token, TokenScope, User},
+    db::{Dogear, Session, Token, TokenScope, User},
     util::{Pagination, SHORT_DATE},
 };
 use minijinja::{escape_formatter, Value};
@@ -80,6 +80,13 @@ pub struct TokensList<'a> {
 #[derive(Serialize)]
 pub struct DogearsList<'a> {
     pub dogears: &'a [Dogear],
+    pub pagination: Pagination,
+}
+
+#[derive(Serialize)]
+pub struct SessionsList<'a> {
+    pub current_session_id: i64,
+    pub sessions: &'a [Session],
     pub pagination: Pagination,
 }
 
