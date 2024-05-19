@@ -157,6 +157,7 @@ impl Db {
             write_token,
             manage_token,
             session_id: session.id,
+            csrf_token: session.csrf_token,
         })
     }
 }
@@ -169,4 +170,5 @@ pub struct TestUser {
     pub write_token: String,
     pub manage_token: String,
     pub session_id: String,
+    pub csrf_token: String,
 }

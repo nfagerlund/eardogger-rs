@@ -464,3 +464,77 @@ async fn post_signup_test() {
         assert!(resp.status().is_client_error()); // any 4xx
     }
 }
+
+/// Reusable test case for ensuring a form-urlencoded POST endpoint is
+/// protected by session-derived CSRF token. Since the affected endpoint's
+/// form body might be anything, caller's expected to construct it as needed
+/// but leave the csrf token off. Also, we expect that every affected form
+/// uses the name "csrf_token" for its csrf guard field.
+async fn reusable_csrf_guard_test(
+    app: &mut Router,
+    uri: &str,
+    form_body_minus_csrf: &str,
+    sessid: &str,
+) {
+    // wrong csrf token: 400
+    {
+        let form = format!("{}&csrf_token={}", form_body_minus_csrf, uuid_string());
+        let req = new_req("POST", uri)
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(sessid)
+            .body(Body::from(form))
+            .unwrap();
+        let resp = do_req(app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+    // absent csrf token: 4xx of some kind (handled by the Form extractor.
+    // TODO: wrap that rejection in WebError.)
+    {
+        let req = new_req("POST", uri)
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(sessid)
+            .body(Body::from(form_body_minus_csrf.to_string()))
+            .unwrap();
+        let resp = do_req(app, req).await;
+        assert!(resp.status().is_client_error());
+    }
+}
+
+/// Logout form logs you out, and is guarded by your session csrf token.
+#[tokio::test]
+async fn post_logout_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // Test unhappy path first, because... it'll destroy our session. :)
+    reusable_csrf_guard_test(&mut app, "/logout", "", &user.session_id).await;
+    // Happy path: redirect and a removal cookie.
+    {
+        let form = format!("csrf_token={}", &user.csrf_token);
+        let req = new_req("POST", "/logout")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        // redirected... don't really care where tbh lol
+        assert!(resp.status().is_redirection());
+        // sessid removal:
+        let got_empty_sessid_cookie =
+            resp.headers()
+                .get_all(header::SET_COOKIE)
+                .iter()
+                .any(|h_val| {
+                    let (name, stuff) = h_val.to_str().unwrap().split_once('=').unwrap();
+                    if name == COOKIE_SESSION {
+                        let (val, _opts) = stuff.split_once(';').unwrap();
+                        if val.is_empty() {
+                            return true;
+                        }
+                    }
+                    false
+                });
+        assert!(got_empty_sessid_cookie);
+    }
+}
