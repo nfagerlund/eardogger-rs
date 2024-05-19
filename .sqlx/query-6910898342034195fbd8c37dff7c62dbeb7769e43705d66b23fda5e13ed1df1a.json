@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    sessions.external_id AS session_external_id,\n                    sessions.id         AS session_id,\n                    sessions.user_id    AS user_id,\n                    sessions.csrf_token AS session_csrf_token,\n                    sessions.user_agent AS session_user_agent,\n                    users.username      AS user_username,\n                    users.email         AS user_email,\n                    users.created       AS user_created\n                FROM sessions JOIN users ON sessions.user_id = users.id\n                WHERE sessions.id = ?1 AND sessions.expires > datetime('now');\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "session_external_id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "session_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_id",
+        "ordinal": 2,
+        "type_info": "Int64"
+      },
+      {
+        "name": "session_csrf_token",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "session_user_agent",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_username",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_email",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_created",
+        "ordinal": 7,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "6910898342034195fbd8c37dff7c62dbeb7769e43705d66b23fda5e13ed1df1a"
+}

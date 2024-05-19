@@ -80,6 +80,16 @@ function deleteToken(id, triggerElement) {
   })
 }
 
+function deleteSession(id, triggerElement) {
+  triggerElement.classList.add('busy-fetching');
+  fetch(`/sessions/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  }).then(() => {
+    replaceFragment('/fragments/sessions', '/account', 'sessions-fragment', triggerElement);
+  })
+}
+
 let originalHistoryState = null;
 
 // general-purpose way to update a fragment of a page
@@ -180,6 +190,9 @@ document.addEventListener('click', function(e){
   } else if (that.matches('.really-delete.token-delete')) {
     e.preventDefault();
     deleteToken(that.getAttribute('data-token-id'), that);
+  } else if (that.matches('.really-delete.session-delete')) {
+    e.preventDefault();
+    deleteSession(that.getAttribute('data-session-id'), that);
   } else if (that.matches('.delete-button')) {
     // Unarmed delete buttons:
     e.preventDefault();

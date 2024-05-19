@@ -1,5 +1,5 @@
 use crate::{
-    db::{Dogear, Token, TokenScope, User},
+    db::{Dogear, Session, Token, TokenScope, User},
     util::{Pagination, SHORT_DATE},
 };
 use minijinja::{escape_formatter, Value};
@@ -84,6 +84,13 @@ pub struct DogearsList<'a> {
 }
 
 #[derive(Serialize)]
+pub struct SessionsList<'a> {
+    pub current_session_id: i64,
+    pub sessions: &'a [Session],
+    pub pagination: Pagination,
+}
+
+#[derive(Serialize)]
 pub struct PersonalMark<'a> {
     pub bookmarklet_url: &'a str,
 }
@@ -153,6 +160,10 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
     env.add_template(
         "fragment.tokens.html.j2",
         include_str!("../../templates/fragment.tokens.html.j2"),
+    )?;
+    env.add_template(
+        "fragment.sessions.html.j2",
+        include_str!("../../templates/fragment.sessions.html.j2"),
     )?;
     env.add_template(
         "fragment.personalmark.html.j2",

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                DELETE FROM sessions\n                WHERE external_id = ?1 AND user_id = ?2;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8592b662b807612323610b51e290d8c1bdbbdde460a0cc856b44c84e0692fd74"
+}

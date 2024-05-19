@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT COUNT(id) AS 'count: u32' FROM sessions WHERE user_id = ?;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count: u32",
+        "ordinal": 0,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d0bfd145ce2e95f3f996ef69796be457cda505a8ef070c76938bfafdb2b14b4e"
+}

@@ -1,0 +1,20 @@
+{# This fragment is meant to be embedded in the account page. #}
+{# Context: sessions_list: SessionsList #}
+{% from "macro.pagination.html.j2" import pagination_links %}
+<section id="sessions-fragment">
+  {{ pagination_links(pagination=sessions_list.pagination, url="/account", fragment_url="/fragments/sessions", fragment_element_id="sessions-fragment") }}
+  <ul id="sessions-list">
+    {% for session in sessions_list.sessions %}
+      <li class="session" data-session-id="{{session.external_id}}">
+        <span class="session-user-agent">{{session.user_agent | unwrap_or("Unknown browser")}}</span>
+        <span class="session-expires">Expires unless used by: {{session.expires | short_date}}</span>
+        {% if session.external_id != sessions_list.current_session_id %}
+            <button type="button" class="delete-button session-delete" data-session-id="{{session.external_id}}">Delete</button>
+        {% else %}
+            <span class="cartouche session-current">Current device</span>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  {{ pagination_links(pagination=sessions_list.pagination, url="/account", fragment_url="/fragments/sessions", fragment_element_id="sessions-fragment") }}
+</section>

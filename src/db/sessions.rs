@@ -1,8 +1,9 @@
 use super::{core::Db, users::User};
+use crate::util::{sqlite_offset, ListMeta, MixedError};
 use crate::util::{uuid_string, COOKIE_SESSION};
-use sqlx::{query, query_as, SqlitePool};
-use time::Duration;
-use time::OffsetDateTime;
+use serde::Serialize;
+use sqlx::{query, query_as, query_scalar, SqlitePool};
+use time::{serde::iso8601, Duration, OffsetDateTime};
 use tower_cookies::cookie::{Cookie, SameSite};
 use tracing::error;
 
@@ -18,8 +19,11 @@ pub struct Sessions<'a> {
 }
 
 /// A record struct for user login sessions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Session {
+    /// An integer ID that allows referencing the session without knowing its
+    /// random ID string. Only really used for remote logouts.
+    pub external_id: i64,
     /// An opaque, securely-random ID string (actually a UUIDv4). Stored as
     /// a cookie in the user's browser and used to look up the session from the db.
     pub id: String,
@@ -32,7 +36,9 @@ pub struct Session {
     /// scheme involving signed cookies. For more info, see:
     /// <https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html>
     pub csrf_token: String,
+    #[serde(with = "iso8601")]
     pub expires: OffsetDateTime,
+    pub user_agent: Option<String>,
 }
 
 impl Session {
@@ -84,27 +90,29 @@ impl<'a> Sessions<'a> {
 
     /// Make a new user login session
     #[tracing::instrument(skip(self))]
-    pub async fn create(&self, user_id: i64) -> sqlx::Result<Session> {
+    pub async fn create(&self, user_id: i64, user_agent: Option<&str>) -> sqlx::Result<Session> {
         let sessid = uuid_string();
         let csrf_token = uuid_string();
         let new_expires = OffsetDateTime::now_utc() + Duration::days(SESSION_LIFETIME_DAYS);
-        // ^^ theoretically I could stack-allocate that but ehhhh
         query_as!(
             Session,
             r#"
-                INSERT INTO sessions (id, user_id, csrf_token, expires)
-                VALUES (?1, ?2, ?3, datetime(?4))
-                RETURNING id, user_id, csrf_token, expires;
+                INSERT INTO sessions (id, user_id, csrf_token, expires, user_agent)
+                VALUES (?1, ?2, ?3, datetime(?4), ?5)
+                RETURNING external_id, id, user_id, csrf_token, expires, user_agent;
             "#,
             sessid,
             user_id,
             csrf_token,
             new_expires,
+            user_agent,
         )
         .fetch_one(self.write_pool())
         .await
     }
 
+    /// Delete a session by its secret session ID. This is used by logout and
+    /// account deletion.
     /// Returns Ok(Some) on success, Ok(None) on a well-behaved not-found.
     #[tracing::instrument(skip_all)]
     pub async fn destroy(&self, sessid: &str) -> sqlx::Result<Option<()>> {
@@ -114,6 +122,32 @@ impl<'a> Sessions<'a> {
                 WHERE id = ?;
             "#,
             sessid,
+        )
+        .execute(self.write_pool())
+        .await?;
+        if res.rows_affected() == 1 {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Delete a session by its integer external_id. Requires the owner's
+    /// user_id as well as a permission check. Used by remote logout.
+    /// Returns Ok(Some) on success, Ok(None) on a well-behaved not-found.
+    #[tracing::instrument(skip_all)]
+    pub async fn destroy_external(
+        &self,
+        external_id: i64,
+        user_id: i64,
+    ) -> sqlx::Result<Option<()>> {
+        let res = query!(
+            r#"
+                DELETE FROM sessions
+                WHERE external_id = ?1 AND user_id = ?2;
+            "#,
+            external_id,
+            user_id,
         )
         .execute(self.write_pool())
         .await?;
@@ -135,9 +169,11 @@ impl<'a> Sessions<'a> {
         let maybe = query!(
             r#"
                 SELECT
+                    sessions.external_id AS session_external_id,
                     sessions.id         AS session_id,
                     sessions.user_id    AS user_id,
                     sessions.csrf_token AS session_csrf_token,
+                    sessions.user_agent AS session_user_agent,
                     users.username      AS user_username,
                     users.email         AS user_email,
                     users.created       AS user_created
@@ -189,11 +225,63 @@ impl<'a> Sessions<'a> {
             created: stuff.user_created,
         };
         let session = Session {
+            external_id: stuff.session_external_id,
             id: stuff.session_id,
             user_id: stuff.user_id,
             csrf_token: stuff.session_csrf_token,
             expires: new_expires,
+            user_agent: stuff.session_user_agent,
         };
         Ok(Some((session, user)))
+    }
+
+    /// List all sessions for a user, so they can log out of a forgotten session remotely.
+    #[tracing::instrument(skip_all)]
+    pub async fn list(
+        &self,
+        user_id: i64,
+        page: u32,
+        size: u32,
+    ) -> Result<(Vec<Session>, ListMeta), MixedError<sqlx::Error>> {
+        // Do multiple reads in a transaction, so count and list see the
+        // same causal slice.
+        let mut tx = self.read_pool().begin().await?;
+
+        // Get count first, as a separate query. For some reason sqlx tries
+        // by default to return the value of COUNT() as an i32, which I
+        // KNOW is not correct, so that column name with a colon overrides it
+        // at the sqlx layer.
+        let count = query_scalar!(
+            r#"
+                SELECT COUNT(id) AS 'count: u32' FROM sessions WHERE user_id = ?;
+            "#,
+            user_id,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let meta = ListMeta { count, page, size };
+
+        let offset = sqlite_offset(page, size)?;
+        let list = query_as!(
+            Session,
+            r#"
+                SELECT external_id, id, user_id, csrf_token, expires, user_agent
+                FROM sessions
+                WHERE user_id = ?1
+                ORDER BY expires DESC, id DESC
+                LIMIT ?2
+                OFFSET ?3;
+            "#,
+            user_id,
+            size,
+            offset,
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok((list, meta))
     }
 }
