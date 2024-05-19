@@ -1,4 +1,6 @@
-use crate::util::{uuid_string, COOKIE_SESSION, DELETE_ACCOUNT_CONFIRM_STRING};
+use crate::util::{
+    url_encoding::encode_uri_component, uuid_string, COOKIE_SESSION, DELETE_ACCOUNT_CONFIRM_STRING,
+};
 
 use super::app_tests::*;
 
@@ -311,6 +313,64 @@ async fn resume_url_test() {
         let doc = bytes_doc(&body);
         // it's the create page
         assert!(doc.has("form#create-dogear"));
+    }
+}
+
+/// And here's the result of USING the create form that the prior two routes
+/// can return.
+#[tokio::test]
+async fn post_mark_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    let form_without = |name: &str, current: &str, prefix: &str| {
+        format!(
+            "display_name={}&current={}&prefix={}",
+            encode_uri_component(name),
+            encode_uri_component(current),
+            encode_uri_component(prefix),
+        )
+    };
+    let form = |name: &str, current: &str, prefix: &str| {
+        format!(
+            "{}&csrf_token={}",
+            form_without(name, current, prefix),
+            &user.csrf_token
+        )
+    };
+
+    // it's csrf-guarded
+    {
+        let form_body = form_without(
+            "Manual",
+            "https://example.com/manual/5",
+            "example.com/manual/",
+        );
+        reusable_csrf_guard_test(&mut app, "/mark", &form_body, &user.session_id).await;
+    }
+    // Most of the validation is back in the db layer, so I'm not gonna bother re-testing.
+    // happy path:
+    {
+        let form_body = form(
+            "Manual",
+            "https://example.com/manual/6",
+            "example.com/manual",
+        );
+        let req = new_req("POST", "/mark")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .session(&user.session_id)
+            .body(Body::from(form_body))
+            .unwrap();
+        let resp = do_req(&mut app, req).await;
+        // TODO: Hmm, actually this should probably be Created, but I think it's 200.
+        assert!(resp.status().is_success());
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        // it's the marked page
+        assert!(doc.has("#mark-success"));
+        // and it's NOT in slow-mode
+        assert!(!doc.has("#slow-mode"));
     }
 }
 

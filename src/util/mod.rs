@@ -1,6 +1,6 @@
 mod bookmarklets;
 mod error;
-mod url_encoding;
+pub mod url_encoding;
 
 use rand::{thread_rng, RngCore};
 use serde::{Deserialize, Serialize};
