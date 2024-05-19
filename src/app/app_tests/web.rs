@@ -758,3 +758,36 @@ async fn post_delete_account_test() {
         assert!(resp.status().is_redirection());
     }
 }
+
+#[tokio::test]
+async fn delete_token_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // btw: DELETEs aren't plain posts, so they're not CSRF-vulnerable.
+    // gotta grab one of these tokens out the DB, since we need its ID.
+    let (manage_token, _) = state
+        .db
+        .tokens()
+        .authenticate(&user.manage_token)
+        .await
+        .unwrap()
+        .unwrap();
+    // 404 on whiff
+    {
+        let req = new_req("DELETE", "/tokens/999")
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+    // 204 on hit
+    {
+        let req = new_req("DELETE", format!("/tokens/{}", manage_token.id))
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    }
+}
