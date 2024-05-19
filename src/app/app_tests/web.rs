@@ -239,6 +239,81 @@ async fn account_and_tokens_test() {
     }
 }
 
+#[tokio::test]
+async fn account_and_sessions_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    // Let's make a second session before we get started.
+    let u_again = state.db.users().by_name("whoever").await.unwrap().unwrap();
+    let _ = state
+        .db
+        .sessions()
+        .create(u_again.id, Some("fiery foqs"))
+        .await
+        .unwrap();
+
+    // Shared behaviors
+    for &(uri, kind) in &[
+        ("/account", HtmlKind::Doc),
+        ("/fragments/sessions", HtmlKind::Frag),
+    ] {
+        // Logged out: 401
+        {
+            let req = new_req("GET", uri).empty();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        }
+        // Includes sessions list
+        {
+            let req = new_req("GET", uri).session(&user.session_id).empty();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let html = bytes_html(&body, kind);
+            // It's a fragment OR a full page, depending
+            match kind {
+                HtmlKind::Doc => {
+                    assert!(has_logged_in_nav(&html));
+                }
+                HtmlKind::Frag => {
+                    assert!(!has_logged_in_nav(&html));
+                }
+            }
+            // 2 sessions
+            let sessions = html.select(&sel("#sessions-list .session")).count();
+            assert_eq!(sessions, 2);
+        }
+        // Pagination
+        {
+            let with_query = format!("{}?size=1&page=2", uri);
+            let req = new_req("GET", with_query).session(&user.session_id).empty();
+            let resp = do_req(&mut app, req).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_bytes(resp).await;
+            let html = bytes_html(&body, kind);
+            // Has #size items
+            let sessions = html.select(&sel("#sessions-list .session")).count();
+            assert_eq!(sessions, 1);
+            // Has no next link (we're on final page)
+            assert!(!html.has(".pagination-link.pagination-next"));
+            // Has prev link
+            let prev = html
+                .select(&sel(".pagination-link.pagination-previous"))
+                .next()
+                .expect("gotta have it");
+            // Links to account page w/ specified page size and #page - 1
+            assert_eq!(prev.attr("href").unwrap(), "/account?page=1&size=1");
+            // has equivalent fragment URL for js-nav
+            assert_eq!(
+                prev.attr("data-fragment-url").unwrap(),
+                "/fragments/sessions?page=1&size=1"
+            );
+        }
+    }
+}
+
 /// /mark/:url page displays one of two underlying pages: the "marked"
 /// page if the URL matches an existing dogear, or the "create" page
 /// if it doesn't.
