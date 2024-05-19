@@ -851,3 +851,49 @@ async fn delete_token_test() {
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
     }
 }
+
+/// This is a bit odd because it's a "plain" POST request, but the body
+/// is empty and the csrf token comes in via query param. This is because
+/// it's coming in via the fragment-replacer javascript. I might consider
+/// reworking that someday.
+#[tokio::test]
+async fn post_fragment_personalmark_test() {
+    let state = test_state().await;
+    let mut app = eardogger_app(state.clone());
+    let user = state.db.test_user("whoever").await.unwrap();
+
+    let uri = |csrf: &str| format!("/fragments/personalmark?csrf_token={}", csrf);
+    // Gotta do the csrf test manually.
+    // wrong csrf token:
+    {
+        let req = new_req("POST", uri(&uuid_string()))
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_bytes(resp).await;
+        let doc = bytes_doc(&body);
+        assert!(doc.has("#error-page"));
+    }
+    // absent csrf token:
+    {
+        let req = new_req("POST", "/fragments/personalmark")
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        // TODO: wrap rejection type for Query
+        assert!(resp.status().is_client_error());
+    }
+    // happy path:
+    {
+        let req = new_req("POST", uri(&user.csrf_token))
+            .session(&user.session_id)
+            .empty();
+        let resp = do_req(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::CREATED);
+        let body = body_bytes(resp).await;
+        let frag = bytes_frag(&body);
+        // One selector from the fragment, one from the inner macro call.
+        assert!(frag.has("#generate-personal-bookmarklet-fragment .bookmarklet"));
+    }
+}
