@@ -21,6 +21,9 @@ pub struct Sessions<'a> {
 /// A record struct for user login sessions.
 #[derive(Debug, Clone)]
 pub struct Session {
+    /// An integer ID that allows referencing the session without knowing its
+    /// random ID string. Only really used for remote logouts.
+    pub external_id: i64,
     /// An opaque, securely-random ID string (actually a UUIDv4). Stored as
     /// a cookie in the user's browser and used to look up the session from the db.
     pub id: String,
@@ -95,7 +98,7 @@ impl<'a> Sessions<'a> {
             r#"
                 INSERT INTO sessions (id, user_id, csrf_token, expires, user_agent)
                 VALUES (?1, ?2, ?3, datetime(?4), ?5)
-                RETURNING id, user_id, csrf_token, expires, user_agent;
+                RETURNING external_id, id, user_id, csrf_token, expires, user_agent;
             "#,
             sessid,
             user_id,
@@ -107,6 +110,8 @@ impl<'a> Sessions<'a> {
         .await
     }
 
+    /// Delete a session by its secret session ID. This is used by logout and
+    /// account deletion.
     /// Returns Ok(Some) on success, Ok(None) on a well-behaved not-found.
     #[tracing::instrument(skip_all)]
     pub async fn destroy(&self, sessid: &str) -> sqlx::Result<Option<()>> {
@@ -116,6 +121,32 @@ impl<'a> Sessions<'a> {
                 WHERE id = ?;
             "#,
             sessid,
+        )
+        .execute(self.write_pool())
+        .await?;
+        if res.rows_affected() == 1 {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Delete a session by its integer external_id. Requires the owner's
+    /// user_id as well as a permission check. Used by remote logout.
+    /// Returns Ok(Some) on success, Ok(None) on a well-behaved not-found.
+    #[tracing::instrument(skip_all)]
+    pub async fn destroy_external(
+        &self,
+        external_id: i64,
+        user_id: i64,
+    ) -> sqlx::Result<Option<()>> {
+        let res = query!(
+            r#"
+                DELETE FROM sessions
+                WHERE external_id = ?1 AND user_id = ?2;
+            "#,
+            external_id,
+            user_id,
         )
         .execute(self.write_pool())
         .await?;
@@ -137,6 +168,7 @@ impl<'a> Sessions<'a> {
         let maybe = query!(
             r#"
                 SELECT
+                    sessions.external_id AS session_external_id,
                     sessions.id         AS session_id,
                     sessions.user_id    AS user_id,
                     sessions.csrf_token AS session_csrf_token,
@@ -192,6 +224,7 @@ impl<'a> Sessions<'a> {
             created: stuff.user_created,
         };
         let session = Session {
+            external_id: stuff.session_external_id,
             id: stuff.session_id,
             user_id: stuff.user_id,
             csrf_token: stuff.session_csrf_token,
@@ -232,7 +265,7 @@ impl<'a> Sessions<'a> {
         let list = query_as!(
             Session,
             r#"
-                SELECT id, user_id, csrf_token, expires, user_agent
+                SELECT external_id, id, user_id, csrf_token, expires, user_agent
                 FROM sessions
                 WHERE user_id = ?1
                 ORDER BY expires DESC, id DESC

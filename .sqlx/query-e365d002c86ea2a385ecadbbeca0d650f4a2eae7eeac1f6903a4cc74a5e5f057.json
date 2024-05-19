@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT external_id, id, user_id, csrf_token, expires, user_agent\n                FROM sessions\n                WHERE user_id = ?1\n                ORDER BY expires DESC, id DESC\n                LIMIT ?2\n                OFFSET ?3;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "external_id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_id",
+        "ordinal": 2,
+        "type_info": "Int64"
+      },
+      {
+        "name": "csrf_token",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "expires",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "user_agent",
+        "ordinal": 5,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e365d002c86ea2a385ecadbbeca0d650f4a2eae7eeac1f6903a4cc74a5e5f057"
+}
