@@ -33,6 +33,7 @@ pub struct Session {
     /// <https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html>
     pub csrf_token: String,
     pub expires: OffsetDateTime,
+    pub user_agent: Option<String>,
 }
 
 impl Session {
@@ -94,7 +95,7 @@ impl<'a> Sessions<'a> {
             r#"
                 INSERT INTO sessions (id, user_id, csrf_token, expires)
                 VALUES (?1, ?2, ?3, datetime(?4))
-                RETURNING id, user_id, csrf_token, expires;
+                RETURNING id, user_id, csrf_token, expires, user_agent;
             "#,
             sessid,
             user_id,
@@ -138,6 +139,7 @@ impl<'a> Sessions<'a> {
                     sessions.id         AS session_id,
                     sessions.user_id    AS user_id,
                     sessions.csrf_token AS session_csrf_token,
+                    sessions.user_agent AS session_user_agent,
                     users.username      AS user_username,
                     users.email         AS user_email,
                     users.created       AS user_created
@@ -193,6 +195,7 @@ impl<'a> Sessions<'a> {
             user_id: stuff.user_id,
             csrf_token: stuff.session_csrf_token,
             expires: new_expires,
+            user_agent: stuff.session_user_agent,
         };
         Ok(Some((session, user)))
     }
