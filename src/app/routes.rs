@@ -313,17 +313,33 @@ pub async fn account(
     auth: AuthSession,
     Query(query): Query<PaginationQuery>,
 ) -> WebResult<Html<String>> {
-    let (tokens, meta) = state
+    // Okay, so it's kind of weird that the pagination query applies to
+    // BOTH the tokens and the sessions, but they can nav independently
+    // in the in-page JS. But in my defense, pagination for these
+    // items is meant as strictly a last-ditch defense against
+    // database murder -- NO ONE is intended to have more than 50 login
+    // sessions or tokens. So it shouldn't be a biggie!
+    let (tokens, token_meta) = state
         .db
         .tokens()
+        .list(auth.user.id, query.page(), query.size())
+        .await?;
+    let (sessions, session_meta) = state
+        .db
+        .sessions()
         .list(auth.user.id, query.page(), query.size())
         .await?;
     let common = auth.common_args("Manage account");
     let tokens_list = TokensList {
         tokens: &tokens,
-        pagination: meta.to_pagination(),
+        pagination: token_meta.to_pagination(),
     };
-    let ctx = context! {common, tokens_list};
+    let sessions_list = SessionsList {
+        current_session_id: auth.session.external_id,
+        sessions: &sessions,
+        pagination: session_meta.to_pagination(),
+    };
+    let ctx = context! {common, tokens_list, sessions_list};
     Ok(Html(state.render_view("account.html.j2", ctx)?))
 }
 
@@ -347,6 +363,27 @@ pub async fn fragment_tokens(
     Ok(Html(state.render_view("fragment.tokens.html.j2", ctx)?))
 }
 
+/// Also kind of like the account page.
+#[tracing::instrument(skip_all)]
+pub async fn fragment_sessions(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Query(query): Query<PaginationQuery>,
+) -> WebResult<Html<String>> {
+    let (sessions, meta) = state
+        .db
+        .sessions()
+        .list(auth.user.id, query.page(), query.size())
+        .await?;
+    let sessions_list = SessionsList {
+        current_session_id: auth.session.external_id,
+        sessions: &sessions,
+        pagination: meta.to_pagination(),
+    };
+    let ctx = context! {sessions_list};
+    Ok(Html(state.render_view("fragment.sessions.html.j2", ctx)?))
+}
+
 /// Handle DELETE for tokens. Effectively an API method, but since it's
 /// only valid for session users, it lives outside the api namespace.
 #[tracing::instrument(skip_all)]
@@ -356,6 +393,26 @@ pub async fn delete_token(
     Path(id): Path<i64>,
 ) -> StatusCode {
     match state.db.tokens().destroy(id, auth.user.id).await {
+        Ok(Some(_)) => StatusCode::NO_CONTENT,       // success
+        Ok(None) => StatusCode::NOT_FOUND,           // failure
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR, // db splode
+    }
+}
+
+/// Handle DELETE for sessions. Effectively an API method, but since it's
+/// only valid for session users, it lives outside the api namespace.
+#[tracing::instrument(skip_all)]
+pub async fn delete_session(
+    State(state): State<DogState>,
+    auth: AuthSession,
+    Path(external_id): Path<i64>,
+) -> StatusCode {
+    match state
+        .db
+        .sessions()
+        .destroy_external(external_id, auth.user.id)
+        .await
+    {
         Ok(Some(_)) => StatusCode::NO_CONTENT,       // success
         Ok(None) => StatusCode::NOT_FOUND,           // failure
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR, // db splode

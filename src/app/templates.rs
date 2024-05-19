@@ -162,6 +162,10 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
         include_str!("../../templates/fragment.tokens.html.j2"),
     )?;
     env.add_template(
+        "fragment.sessions.html.j2",
+        include_str!("../../templates/fragment.sessions.html.j2"),
+    )?;
+    env.add_template(
         "fragment.personalmark.html.j2",
         include_str!("../../templates/fragment.personalmark.html.j2"),
     )?;

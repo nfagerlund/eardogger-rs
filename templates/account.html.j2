@@ -1,5 +1,5 @@
 {# The account page. #}
-{# Context: common: Common, tokens_list: TokensList #}
+{# Context: common: Common, tokens_list: TokensList, sessions_list: SessionsList #}
 {% extends "_layout.html.j2" %}
 {% block body %}
 <h2>Change password</h2>
@@ -72,6 +72,12 @@
     <button type="submit">DELETE ACCOUNT</button>
   </form>
 </details>
+
+<h2>Manage login sessions</h2>
+
+<p>This is a list of all your currently active logins. You can remotely log out of any other device by deleting the associated login session.</p>
+
+{% include "fragment.sessions.html.j2" %}
 
 <h2>Manage access tokens</h2>
 
