@@ -13,6 +13,8 @@ pub struct Options {
     pub migrate: bool,
     /// `--status` prints the current database migrations status and then exits.
     pub status: bool,
+    /// `--version` prints the commit sha and build date, then exits.
+    pub version: bool,
 }
 
 enum ParserState {
@@ -24,6 +26,7 @@ pub fn cli_options() -> Options {
     let mut config = None;
     let mut migrate = false;
     let mut status = false;
+    let mut version = false;
 
     let mut state = ParserState::Scanning;
     for arg in std::env::args() {
@@ -38,6 +41,8 @@ pub fn cli_options() -> Options {
                     state = ParserState::ConfigVal;
                 } else if arg == "--status" {
                     status = true;
+                } else if arg == "--version" {
+                    version = true;
                 }
                 // otherwise ignore.
             }
@@ -60,5 +65,6 @@ pub fn cli_options() -> Options {
         config,
         migrate,
         status,
+        version,
     }
 }

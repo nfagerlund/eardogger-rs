@@ -3,6 +3,7 @@ mod args;
 mod config;
 mod db;
 mod util;
+mod version;
 
 use db::Db;
 use sqlx::{
@@ -36,6 +37,11 @@ const MAX_DB_READER_THREADS: u32 = 20;
 async fn main() -> anyhow::Result<()> {
     // Get args
     let options = args::cli_options();
+    if options.version {
+        println!("Built {}", version::build_date());
+        println!("from commit {}", version::commit_sha());
+        return Ok(());
+    }
 
     // Get the config
     let config = match options.config {
