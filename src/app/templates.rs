@@ -199,6 +199,7 @@ pub fn load_templates() -> anyhow::Result<minijinja::Environment<'static>> {
     // but I want to make sure the differing expectations are recorded for future
     // maintenance.
     env.add_filter("unwrap_or", unwrap_or);
+    env.add_function("cache_buster", crate::version::commit_sha);
     // By default, minijinja prints None values as the literal string
     // "none". This is apparently intentional, but I extremely don't want it.
     // Luckily, the formatter provides a clean way to patch that for the whole
