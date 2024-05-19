@@ -83,7 +83,7 @@ async fn session_lifetime_modifier() {
         .expect("failed user creation");
     let session = db
         .sessions()
-        .create(session_user.id, None)
+        .create(session_user.id, Some("furry-fox :)"))
         .await
         .expect("failed to get session");
     // make sure time crate + sqlx is doing what we expect.
@@ -141,6 +141,17 @@ async fn session_lifetime_modifier() {
     // expiry REALLY got reset:
     assert!(new_stored_delta > Duration::days(89));
     assert!(new_stored_delta < Duration::days(91));
+
+    // Now let's list and destroy some things.
+    let (list, meta) = db.sessions().list(session_user.id, 1, 50).await.unwrap();
+    assert_eq!(meta.count, 1);
+    let doomed_id = list[0].id.clone();
+    db.sessions().destroy(&doomed_id).await.unwrap();
+    let (_, meta) = db.sessions().list(session_user.id, 1, 50).await.unwrap();
+    assert_eq!(meta.count, 0);
+    // re-destroy whiffs
+    let gone = db.sessions().destroy(&doomed_id).await.expect("no db err");
+    assert!(gone.is_none());
 }
 
 #[tokio::test]

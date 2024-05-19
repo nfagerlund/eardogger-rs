@@ -473,6 +473,7 @@ pub struct LoginParams {
 pub async fn post_login(
     State(state): State<DogState>,
     cookies: Cookies,
+    req_headers: HeaderMap,
     Form(params): Form<LoginParams>,
 ) -> WebResult<Redirect> {
     // First, check the login CSRF cookie
@@ -514,7 +515,10 @@ pub async fn post_login(
         .authenticate(&params.username, &params.password)
         .await?
     {
-        let session = state.db.sessions().create(user.id, None).await?;
+        let user_agent = req_headers
+            .get(header::USER_AGENT)
+            .and_then(|v| v.to_str().ok());
+        let session = state.db.sessions().create(user.id, user_agent).await?;
         cookies.add(session.into_cookie());
     }
 
@@ -543,6 +547,7 @@ pub struct SignupParams {
 pub async fn post_signup(
     State(state): State<DogState>,
     cookies: Cookies,
+    req_headers: HeaderMap,
     maybe_auth: Option<AuthSession>,
     Form(params): Form<SignupParams>,
 ) -> WebResult<Redirect> {
@@ -586,7 +591,10 @@ pub async fn post_signup(
             params.email.as_deref(),
         )
         .await?;
-    let session = state.db.sessions().create(user.id, None).await?;
+    let user_agent = req_headers
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok());
+    let session = state.db.sessions().create(user.id, user_agent).await?;
     cookies.add(session.into_cookie());
     Ok(Redirect::to("/"))
 }
