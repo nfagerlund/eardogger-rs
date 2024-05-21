@@ -79,10 +79,10 @@ impl IntoResponse for AppError {
             status,
             kind,
         } = self;
-        error!(%message, "uncaught 500 error");
         // Suppress 500 error details for prod. (Other error codes are fine,
         // but 500s could be pretty much anything.)
         let message = if is_production() && status == StatusCode::INTERNAL_SERVER_ERROR {
+            error!(%message, "uncaught 500 error");
             Cow::from(
                 r#"The server had a problem and couldn't recover. This is
                 probably a bug in the site."#,
