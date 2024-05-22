@@ -2,6 +2,7 @@
 name = "eardogger-rs"
 version = "0.1.0"
 edition = "2021"
+default-run = "eardogger-rs"
 
 # Per the sqlx readme: the macros are hefty, so speeding them up
 # in dev builds can have noticable effects. Note that cargo's `test`
@@ -61,4 +62,9 @@ minijinja = { version = "1.0.12", features = ["json"] }
 [dev-dependencies]
 scraper = "0.19.0"
 
-# Clean-up:
+[features]
+postgres-import = ["sqlx/postgres"]
+
+[[bin]]
+name = "postgres-import"
+required-features = ["postgres-import"]
