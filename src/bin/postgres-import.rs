@@ -96,6 +96,65 @@ async fn v1_to_v2(v1postgres: PgPool, v2sqlite: SqlitePool) {
     v1postgres.close().await;
 }
 
+async fn v2_to_v1(v2sqlite: SqlitePool, v1postgres: PgPool) {
+    let mut user_stream = query_as::<_, V2User>(
+        r#"
+            SELECT id, username, password_hash, email, created
+            FROM users;
+        "#,
+    )
+    .fetch(&v2sqlite);
+
+    // Do each user in a transaction
+    while let Some(v2user) = user_stream.try_next().await.unwrap() {
+        // Start a per-user transaction
+        println!(
+            "processing user {} (old ID {})",
+            &v2user.username, v2user.id
+        );
+        let mut tx = v1postgres.begin().await.unwrap();
+        // insert user
+        let v1_user_id = v2user.write_v1(&mut *tx).await.unwrap();
+        println!("  wrote new user (ID {})", v1_user_id);
+
+        // query tokens
+        let mut tokens_stream = query_as::<_, V2Token>(
+            r#"
+                SELECT id, user_id, token_hash, scope, created, comment, last_used
+                FROM tokens
+                WHERE user_id = ?1;
+            "#,
+        )
+        .bind(v2user.id)
+        .fetch(&v2sqlite);
+        while let Some(v2token) = tokens_stream.try_next().await.unwrap() {
+            v2token.write_v1(v1_user_id, &mut *tx).await.unwrap();
+            println!("  wrote {:?} token, old ID {}", &v2token.scope, v2token.id)
+        }
+
+        // query dogears
+        let mut dogears_stream = query_as::<_, V2Dogear>(
+            r#"
+                SELECT id, user_id, prefix, current, display_name, updated
+                FROM dogears
+                WHERE user_id = ?1;
+            "#,
+        )
+        .bind(v2user.id)
+        .fetch(&v2sqlite);
+        while let Some(v2dogear) = dogears_stream.try_next().await.unwrap() {
+            v2dogear.write_v1(v1_user_id, &mut *tx).await.unwrap();
+            println!("  wrote dogear, old ID {}", v2dogear.id);
+        }
+
+        // that's a wrap
+        tx.commit().await.unwrap();
+    }
+
+    v2sqlite.close().await;
+    v1postgres.close().await;
+}
+
 #[derive(FromRow)]
 struct V1User {
     id: i32, // INT4
