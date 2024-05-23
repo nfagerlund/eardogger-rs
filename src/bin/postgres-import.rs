@@ -15,10 +15,10 @@ use futures_util::stream::TryStreamExt;
 use lazy_static::lazy_static;
 use sqlx::{
     pool::PoolOptions,
-    postgres::PgConnectOptions,
+    postgres::{PgConnectOptions, PgQueryResult},
     query, query_as, query_scalar,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteQueryResult, SqliteSynchronous},
-    Executor, FromRow, PgPool, Sqlite, SqlitePool,
+    Executor, FromRow, PgPool, Postgres, Sqlite, SqlitePool,
 };
 use std::env;
 use std::str::FromStr;
@@ -142,18 +142,19 @@ impl V1Token {
     {
         // Lil guardrail... I'm not concerned about user_id, because we're already
         // guarded by a where clause above.
-        if self.token_hash.is_none() {
+        let Some(token_hash) = &self.token_hash else {
             return Ok(SqliteQueryResult::default());
-        }
+        };
         query(
             r#"
                 INSERT INTO tokens (user_id, token_hash, scope, created, comment, last_used)
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-                ON CONFLICT(token_hash) DO NOTHING;
+                ON CONFLICT(token_hash) DO UPDATE
+                    SET last_used = ?6;
             "#,
         )
         .bind(v2_user_id)
-        .bind(self.token_hash.as_ref().unwrap())
+        .bind(token_hash)
         .bind(
             self.scope
                 .as_ref()
@@ -239,6 +240,29 @@ struct V2User {
     created: OffsetDateTime,
 }
 
+impl V2User {
+    async fn write_v1<'a, E>(&self, e: E) -> Result<i32, sqlx::Error>
+    where
+        E: Executor<'a, Database = Postgres>,
+    {
+        query_scalar::<_, i32>(
+            r#"
+                INSERT INTO users (username, password, email, created)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT(username) DO UPDATE
+                    SET password = $2, email = $3, created = $4
+                RETURNING id;
+            "#,
+        )
+        .bind(&self.username)
+        .bind(Some(&self.password_hash))
+        .bind(&self.email)
+        .bind(Some(&self.created))
+        .fetch_one(e)
+        .await
+    }
+}
+
 #[derive(FromRow)]
 struct V2Token {
     id: i64,
@@ -250,6 +274,34 @@ struct V2Token {
     last_used: Option<OffsetDateTime>,
 }
 
+impl V2Token {
+    async fn write_v1<'a, E>(&self, v1_user_id: i32, e: E) -> Result<PgQueryResult, sqlx::Error>
+    where
+        E: Executor<'a, Database = Postgres>,
+    {
+        // guardrail
+        let Some(token_scope) = V1TokenScope::from_str(&self.scope) else {
+            return Ok(PgQueryResult::default());
+        };
+        query(
+            r#"
+                INSERT INTO tokens (user_id, token_hash, scope, created, comment, last_used)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT(token_hash) DO UPDATE
+                    SET last_used = $6;
+            "#,
+        )
+        .bind(v1_user_id)
+        .bind(Some(&self.token_hash))
+        .bind(Some(token_scope))
+        .bind(Some(&self.created))
+        .bind(&self.comment)
+        .bind(self.last_used)
+        .execute(e)
+        .await
+    }
+}
+
 #[derive(FromRow)]
 struct V2Dogear {
     id: i64,
@@ -259,6 +311,29 @@ struct V2Dogear {
     display_name: Option<String>,
     updated: OffsetDateTime,
     // UNIQUE (user_id, prefix) ON CONFLICT ROLLBACK
+}
+
+impl V2Dogear {
+    async fn write_v1<'a, E>(&self, v1_user_id: i32, e: E) -> Result<PgQueryResult, sqlx::Error>
+    where
+        E: Executor<'a, Database = Postgres>,
+    {
+        query(
+            r#"
+                INSERT INTO dogears (user_id, prefix, current, display_name, updated)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT(user_id, prefix) DO UPDATE
+                    SET current = $3, display_name = $4, updated = $5;
+            "#,
+        )
+        .bind(v1_user_id)
+        .bind(&self.prefix)
+        .bind(Some(&self.current))
+        .bind(&self.display_name)
+        .bind(Some(self.updated))
+        .execute(e)
+        .await
+    }
 }
 
 struct Options {
