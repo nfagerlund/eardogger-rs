@@ -32,6 +32,11 @@ lazy_static! {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let (v2sqlite, v1postgres) = databases(&parse_args()).await;
+
+    v1_to_v2(v1postgres, v2sqlite).await;
+}
+
+async fn v1_to_v2(v1postgres: PgPool, v2sqlite: SqlitePool) {
     // I'm gonna just yolo it on the resource usage here -_- probably
     // I should be handling batching but, pain in the butt, and the data be small.
     let mut user_stream = query_as::<_, V1User>(
