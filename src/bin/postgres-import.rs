@@ -18,6 +18,7 @@ struct Options {
     sqlite_url: String,
 }
 
+#[derive(Debug)]
 enum ArgsParseState {
     Scanning,
     PostgresVal,
@@ -41,9 +42,11 @@ fn parse_args() -> Options {
             }
             ArgsParseState::PostgresVal => {
                 postgres_url = Some(arg);
+                state = ArgsParseState::Scanning;
             }
             ArgsParseState::SqliteVal => {
                 sqlite_url = Some(arg);
+                state = ArgsParseState::Scanning;
             }
         }
     }
