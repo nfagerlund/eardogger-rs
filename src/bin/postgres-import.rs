@@ -169,6 +169,7 @@ struct V1Dogear {
     updated: Option<OffsetDateTime>,
 }
 
+#[allow(non_camel_case_types)]
 #[derive(sqlx::Type)]
 #[sqlx(type_name = "token_scope", rename_all = "lowercase")]
 enum V1TokenScope {
@@ -183,6 +184,34 @@ impl V1TokenScope {
             V1TokenScope::Write_Dogears => "write_dogears",
         }
     }
+
+    fn from_str(v: &str) -> Option<Self> {
+        match v {
+            "manage_dogears" => Some(Self::Manage_Dogears),
+            "write_dogears" => Some(Self::Write_Dogears),
+            _ => None, // the postgres type doesn't have an "invalid" variant, so.
+        }
+    }
+}
+
+#[derive(FromRow)]
+struct V2User {
+    id: i64,
+    username: String,
+    password_hash: String,
+    email: Option<String>,
+    created: OffsetDateTime,
+}
+
+#[derive(FromRow)]
+struct V2Token {
+    id: i64,
+    user_id: i64,
+    token_hash: String,
+    scope: String,
+    created: OffsetDateTime,
+    comment: Option<String>,
+    last_used: Option<OffsetDateTime>,
 }
 
 #[derive(FromRow)]
