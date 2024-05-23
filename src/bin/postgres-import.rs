@@ -31,7 +31,6 @@ lazy_static! {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let time_of_import = OffsetDateTime::now_utc();
     let (v2sqlite, v1postgres) = databases(&parse_args()).await;
     // I'm gonna just yolo it on the resource usage here -_- probably
     // I should be handling batching but, pain in the butt, and the data be small.
@@ -45,9 +44,14 @@ async fn main() {
     // Do each user import in a transaction.
     while let Some(v1user) = user_stream.try_next().await.unwrap() {
         // Start a per-user transaction
+        println!(
+            "processing user {} (old ID {})",
+            &v1user.username, v1user.id
+        );
         let mut tx = v2sqlite.begin().await.unwrap();
         // insert user
         let v2_user_id = v1user.write_v2(&mut *tx).await.unwrap();
+        println!("  wrote new user (ID {})", v2_user_id);
 
         // query tokens
         let mut tokens_stream = query_as::<_, V1Token>(
@@ -61,6 +65,7 @@ async fn main() {
         .fetch(&v1postgres);
         while let Some(v1token) = tokens_stream.try_next().await.unwrap() {
             v1token.write_v2(v2_user_id, &mut *tx).await.unwrap();
+            println!("  wrote {:?} token, old ID {}", &v1token.scope, v1token.id)
         }
 
         // query dogears
@@ -75,11 +80,15 @@ async fn main() {
         .fetch(&v1postgres);
         while let Some(v1dogear) = dogears_stream.try_next().await.unwrap() {
             v1dogear.write_v2(v2_user_id, &mut *tx).await.unwrap();
+            println!("  wrote dogear, old ID {}", v1dogear.id);
         }
 
         // that's a wrap
         tx.commit().await.unwrap();
     }
+
+    v2sqlite.close().await;
+    v1postgres.close().await;
 }
 
 #[derive(FromRow)]
@@ -197,7 +206,7 @@ impl V1Dogear {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(sqlx::Type)]
+#[derive(sqlx::Type, Debug)]
 #[sqlx(type_name = "token_scope", rename_all = "lowercase")]
 enum V1TokenScope {
     Manage_Dogears,
