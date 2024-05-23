@@ -31,9 +31,16 @@ lazy_static! {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let (v2sqlite, v1postgres) = databases(&parse_args()).await;
-
-    v1_to_v2(v1postgres, v2sqlite).await;
+    let options = parse_args();
+    let (v2sqlite, v1postgres) = databases(&options).await;
+    match options.mode {
+        ImportMode::ToSqlite => {
+            v1_to_v2(v1postgres, v2sqlite).await;
+        }
+        ImportMode::ToPostgres => {
+            v2_to_v1(v2sqlite, v1postgres).await;
+        }
+    }
 }
 
 async fn v1_to_v2(v1postgres: PgPool, v2sqlite: SqlitePool) {
@@ -188,6 +195,7 @@ impl V1User {
     }
 }
 
+#[allow(dead_code)]
 #[derive(FromRow)]
 struct V1Token {
     id: i32,              // INT4
@@ -233,6 +241,7 @@ impl V1Token {
     }
 }
 
+#[allow(dead_code)]
 #[derive(FromRow)]
 struct V1Dogear {
     id: i32,      // INT4
@@ -327,6 +336,7 @@ impl V2User {
     }
 }
 
+#[allow(dead_code)]
 #[derive(FromRow)]
 struct V2Token {
     id: i64,
@@ -366,6 +376,7 @@ impl V2Token {
     }
 }
 
+#[allow(dead_code)]
 #[derive(FromRow)]
 struct V2Dogear {
     id: i64,
@@ -403,6 +414,13 @@ impl V2Dogear {
 struct Options {
     postgres_url: String,
     sqlite_url: String,
+    mode: ImportMode,
+}
+
+#[derive(Clone, Copy)]
+enum ImportMode {
+    ToSqlite,
+    ToPostgres,
 }
 
 #[derive(Debug)]
@@ -414,9 +432,13 @@ enum ArgsParseState {
 
 /// Grab the options off the CLI.
 fn parse_args() -> Options {
+    let usage =
+        "Usage: postgres-import --postgres_url <URL> --sqlite_url <URL> [--revert-to-postgres]";
+
     let mut postgres_url: Option<String> = None;
     let mut sqlite_url: Option<String> = None;
     let mut state = ArgsParseState::Scanning;
+    let mut mode = ImportMode::ToSqlite;
 
     for arg in env::args() {
         match state {
@@ -425,6 +447,8 @@ fn parse_args() -> Options {
                     state = ArgsParseState::PostgresVal;
                 } else if arg == "--sqlite_url" {
                     state = ArgsParseState::SqliteVal;
+                } else if arg == "--revert-to-postgres" {
+                    mode = ImportMode::ToPostgres;
                 }
             }
             ArgsParseState::PostgresVal => {
@@ -438,10 +462,9 @@ fn parse_args() -> Options {
         }
     }
     Options {
-        postgres_url: postgres_url
-            .expect("Usage: postgres-import --postgres_url <URL> --sqlite_url <URL>"),
-        sqlite_url: sqlite_url
-            .expect("Usage: postgres-import --postgres_url <URL> --sqlite_url <URL>"),
+        postgres_url: postgres_url.expect(usage),
+        sqlite_url: sqlite_url.expect(usage),
+        mode,
     }
 }
 
