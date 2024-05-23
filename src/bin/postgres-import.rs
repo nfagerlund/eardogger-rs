@@ -47,7 +47,7 @@ async fn main() {
             r#"
                 INSERT INTO users (username, password_hash, email, created)
                 VALUES (?1, ?2, ?3, ?4)
-                ON CONFLICT username DO UPDATE
+                ON CONFLICT(username) DO UPDATE
                     SET password_hash = ?2, email = ?3, created = ?4
                 RETURNING id, username;
             "#,
@@ -81,12 +81,18 @@ async fn main() {
                 r#"
                     INSERT INTO tokens (user_id, token_hash, scope, created, comment, last_used)
                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-                    ON CONFLICT token_hash DO NOTHING;
+                    ON CONFLICT(token_hash) DO NOTHING;
                 "#,
             )
             .bind(v2_user_id)
             .bind(v1token.token_hash.as_ref().unwrap())
-            .bind(v1token.scope.as_deref().unwrap_or("invalid"))
+            .bind(
+                v1token
+                    .scope
+                    .as_ref()
+                    .map(|s| s.to_str())
+                    .unwrap_or("invalid"),
+            )
             .bind(v1token.created.as_ref().unwrap_or(&time_of_import))
             .bind(&v1token.comment)
             .bind(v1token.last_used)
@@ -114,7 +120,7 @@ async fn main() {
                 r#"
                     INSERT INTO dogears (user_id, prefix, current, display_name, updated)
                     VALUES (?1, ?2, ?3, ?4, ?5)
-                    ON CONFLICT prefix DO UPDATE
+                    ON CONFLICT(user_id, prefix) DO UPDATE
                         SET current = ?3, display_name = ?4, updated = ?5;
                 "#,
             )
@@ -147,7 +153,7 @@ struct V1Token {
     id: i32,              // INT4
     user_id: Option<i32>, // oh lol yikes // INT4
     token_hash: Option<String>,
-    scope: Option<String>,
+    scope: Option<V1TokenScope>,
     created: Option<OffsetDateTime>,
     comment: Option<String>,
     last_used: Option<OffsetDateTime>,
@@ -161,6 +167,22 @@ struct V1Dogear {
     current: Option<String>,
     display_name: Option<String>,
     updated: Option<OffsetDateTime>,
+}
+
+#[derive(sqlx::Type)]
+#[sqlx(type_name = "token_scope", rename_all = "lowercase")]
+enum V1TokenScope {
+    Manage_Dogears,
+    Write_Dogears,
+}
+
+impl V1TokenScope {
+    fn to_str(&self) -> &'static str {
+        match self {
+            V1TokenScope::Manage_Dogears => "manage_dogears",
+            V1TokenScope::Write_Dogears => "write_dogears",
+        }
+    }
 }
 
 #[derive(FromRow)]
