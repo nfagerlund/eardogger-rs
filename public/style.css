@@ -35,9 +35,9 @@
   :root {
     --color-background: #092a37;
     --color-text: #e4c485;
-    --color-link: #62a4e6;
-    --color-link-visited: #9d7bdd;
-    --color-link-hover: #807ef7;
+    --color-link: #f09d6a;
+    --color-link-visited: #b082d7;
+    --color-link-hover: #f26262;
     --color-border: #888;
     --color-button-border: #888;
     --color-divider: grey;
