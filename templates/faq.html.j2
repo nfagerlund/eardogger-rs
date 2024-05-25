@@ -8,7 +8,7 @@
 
 <p>I made it because there's lots of nice ways to follow an ongoing comic, but I couldn't find a nice way to <em>catch up on a backlog.</em> I kept losing my place, especially if I tried to pick up reading again on a different device.</p>
 
-<p>Normal web browser bookmarks were too fiddly. What I wanted was something that acts like the receipt or bus pass marking my place in a physical book: <strong>there's one bookmark, and you move it to your new spot when you pause.</strong></p>
+<p>Normal web browser bookmarks were too fiddly. I wanted them to just act like the old bus pass that marks my place in a physical book: <strong>there's one bookmark, and you move it to your new spot when you pause.</strong></p>
 
 <p>So Eardogger does that.</p>
 
@@ -32,13 +32,13 @@
 
 <p>For reasons that I promise make sense from a certain perspective, I've chosen to rewrite Eardogger from the ground up, replacing Node.js and PostgreSQL with Rust and Sqlite. I doubt you'll notice much difference when using the site. I had to make everyone log in again, but your personal bookmarklets should all still work as normal.</p>
 
-<p>If you're the type of pervert who is <em>into that sort of thing,</em> I wrote a bit more about the why and the wherefore <a href="https://roadrunnertwice.dreamwidth.org/597714.html">over on my journal</a>, but the main upshot is that I've unlocked Scavenger Mode and can now run the site in a much wider range of hosting environments. In fact, it's currently running on some old-fashioned shared web hosting on DreamHost, of all things.</p>
+<p>If you're the type of pervert who is <em>into that sort of thing,</em> I wrote a bit more about the why and the wherefore <a href="https://roadrunnertwice.dreamwidth.org/597714.html">over on my journal</a>, but the main upshot is that I've unlocked Scavenger Mode and can now run the site in a much wider range of hosting environments. (In fact, it's happily running on some old-fashioned shared web hosting at DreamHost, which I wrote off as impractical several years back.)</p>
 
-<p>But it's not <em>only</em> arcana this time around &mdash; I actually added a couple <em>real</em> features while I was in the mix:</p>
+<p>But it's not <em>only</em> arcana this time around &mdash; I actually added a couple real features while I was in the mix:</p>
 
 <ul>
   <li>Dark mode!!! No more zorching your eyes when reading in bed. For now this is strictly automatic; if your device or browser is on dark mode, so is Eardogger. If you need it to be a manual setting instead, text me.</li>
-  <li>Remote logout. The <a href="/account">account page</a> now has a list of all the browsers you're logged in on; if you left yourself logged in on someone else's computer by accident, you can log out of there from home. This is a bit of an archaic feature, from an era of sleepovers and of modems hooked up to a shared phone line.</li>
+  <li>Remote logout. The <a href="/account">account page</a> now has a list of all the browsers you're logged in on; if you left yourself logged in on someone else's computer by accident, you can log out of there from home. (I guess you're probably not staying up late surfing the web on the family PC at a sleepover anymore, but I still wanted this.)</li>
   <li>Also on the <a href="/account">account page</a>, you can now change/remove your email address, or delete your account. These were features I meant to add from the start, but I got distracted or something.</li>
 </ul>
 
@@ -47,10 +47,10 @@
 <p>I tend to leave Eardogger alone for more than a year at a time, but occasionally get inspired or provoked into doing some work on it.</p>
 
 <ul>
-  <li>November 2022: Migrated to new infrastructure platforms (Fly.io and Neon.tech), no observable changes.</li>
-  <li>September 2021: Added token auth and "personal bookmarklet" generator to play nice with web browser tracking protections. Converted all backend code to TypeScript. (<a href="https://roadrunnertwice.dreamwidth.org/589024.html">journal post</a>)</li>
-  <li>April 2020: Improved matching of sites with optional `m.blahblah` and `www.blahblah` subdomains.</li>
   <li>September 2019: Origin of Eardogger, written in JavaScript for Node.js. Prototyped on Glitch.com, then launched on Heroku. Minor adjustments to behavior throughout the fall. (<a href="https://roadrunnertwice.dreamwidth.org/575683.html">oblique manifesto</a> about bookmarks, <a href="https://roadrunnertwice.dreamwidth.org/575858.html">wip dev notes</a>, and <a href="https://roadrunnertwice.dreamwidth.org/576559.html">announcement post</a>)</li>
+  <li>April 2020: Improved matching of sites with optional `m.blahblah` and `www.blahblah` subdomains.</li>
+  <li>September 2021: Added token auth and "personal bookmarklet" generator to play nice with web browser tracking protections. Converted all backend code to TypeScript. (<a href="https://roadrunnertwice.dreamwidth.org/589024.html">journal post</a>)</li>
+  <li>November 2022: Migrated to new infrastructure platforms (Fly.io and Neon.tech), no observable changes.</li>
 </ul>
 
 <h2 id="faq">Colophon</h2>
