@@ -209,7 +209,7 @@ form#logout {
   padding-left: 0;
 }
 
-#dogears li,
+.dogear,
 .token,
 .session {
   list-style: none;
@@ -221,12 +221,13 @@ form#logout {
   border-bottom: 1px solid;
 }
 
-#dogears li:last-child,
-.token:last-child {
+.dogear:last-child,
+.token:last-child,
+.session:last-child {
   border-bottom: 0;
 }
 
-#dogears li {
+.dogear {
   grid-template-columns: 1fr auto auto;
   grid-template-rows: 1fr auto;
   grid-template-areas:
@@ -234,20 +235,22 @@ form#logout {
     "current date date";
 }
 
-#dogears li * {
+/* make sure user-provided strings behave themselves */
+.dogear a,
+.dogear .current {
   word-wrap: break-word;
   overflow-wrap: break-word;
   min-width: 0;
   max-width: 100%;
 }
 
-#dogears a {
+.dogear a {
   /* main link */
   grid-area: link;
   justify-self: self-start; /* no invisible click targets */
 }
 
-#dogears .delete-dogear {
+.dogear .delete-dogear {
   grid-area: delete;
   align-self: self-start;
 }
@@ -275,16 +278,16 @@ form#logout {
   background-color: var(--color-danger);
 }
 
-#dogears .current {
+.dogear .current {
   grid-area: current;
 }
 
-#dogears .date {
+.dogear .date {
   grid-area: date;
 }
 
-#dogears .current,
-#dogears .date,
+.dogear .current,
+.dogear .date,
 .token-scope,
 .token-created,
 .token-last-used,

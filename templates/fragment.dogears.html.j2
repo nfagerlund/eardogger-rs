@@ -6,7 +6,7 @@
 
   <ul id="dogears">
     {% for dogear in dogears_list.dogears %}
-      <li>
+      <li class="dogear">
           <a href="{{dogear.current}}">{{dogear.display_name | unwrap_or(dogear.prefix)}}</a>
           <span class="current">({{dogear.current}})</span>
           <span class="date">Last read: {{dogear.updated | short_date}}</span>
