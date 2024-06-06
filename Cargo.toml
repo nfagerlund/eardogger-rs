@@ -69,3 +69,9 @@ postgres-import = ["sqlx/postgres"]
 [[bin]]
 name = "postgres-import"
 required-features = ["postgres-import"]
+
+# Patch for tracing-appender: 0.2.3 + private fix for tracing#2937 + knock out a
+# path dep so it plays nice w/ published versions of tracing-subscriber.
+# (branch: nf/jun24-inital-prune)
+[patch.crates-io]
+tracing-appender = { git = "https://github.com/nfagerlund/tracing.git", rev = "734dde11" }
