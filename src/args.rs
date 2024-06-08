@@ -11,7 +11,7 @@ pub struct Options {
     /// `--migrate` runs any pending database migrations, and then exits instead
     /// of starting the server.
     pub migrate: bool,
-    /// `--status` prints the current database migrations status and then exits.
+    /// `--status` (or `--check`) prints the current database migrations status and then exits.
     pub status: bool,
     /// `--version` prints the commit sha and build date, then exits.
     pub version: bool,
@@ -39,7 +39,8 @@ pub fn cli_options() -> Options {
                     migrate = true;
                 } else if arg == "--config" {
                     state = ParserState::ConfigVal;
-                } else if arg == "--status" {
+                } else if arg == "--status" || arg == "--check" {
+                    // Originally chose --status, but kept typing --check by accident lol
                     status = true;
                 } else if arg == "--version" {
                     version = true;
