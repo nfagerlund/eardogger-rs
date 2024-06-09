@@ -137,6 +137,21 @@ We're using sqlx's database migration features.
 - We validate migrations at server startup if `validate_migrations` is set in the config file. You might want to turn it off if you're starting up constantly, but so far the performance impact seems unmeasurably small. Probably gets bigger if you have a ton of migrations.
 - For any nastier form of db repair, you'll want the sqlx CLI itself and a copy of the migrations dir from the source. The deployment tarball includes the migrations.
 
+### Data import
+
+Eardogger v1 and v2 use different databases with different sql dialects and slightly different schemae, and attempting to export -> normalize -> import _actual sql statements_ (or honestly even CSV) sounded like an awful time. So we got a lil migration script:
+
+- `cargo build --release --features postgres-import --bin postgres-import`
+- `./target/release/postgres-import --sqlite_url URL --postgres_url URL`
+
+It's stashed behind a cargo feature so we can usually skip the sqlx postgres dep.
+
+You need to create a sqlite db in WAL mode before running it.
+
+It can work with an existing destination database, and will update existing records when possible... but that's just to make it more resilient during a one-time migration that encounters hiccups. It's not meant to be run on a regular basis against an in-service DB, and could result in data corruption if someone created a conflicting username since the last run or something.
+
+There's also a `--revert-to-postgres` option for reversing the polarity. I haven't really tested it.
+
 ### FCGI mode and Apache configs
 
 The main hosting environment for fcgi mode is Apache with mod_fcgid.
