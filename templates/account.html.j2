@@ -84,15 +84,7 @@
 <p>This is a list of your access tokens, which are associated with <a href="/install">personal bookmarklets</a>. <button type="button" class="help-reveal" data-help-target="help-account-access-token">(huh?)</button></p>
 
 <div id="help-account-access-token" class="help help-hidden">
-  <p>When you mark your spot on a site, Eardogger needs to know who you are so it can update the right person's dogears. There's a few ways we could do that:</p>
-
-  <ul>
-    <li>Navigate away from what you're reading to a page on eardogger.com, learn who you are via your login cookie, then update your dogears and send you back to where you were. Reliable but slow; we use this as a fallback if a faster method fails.</li>
-    <li>Send an update request to eardogger.com via JavaScript, and include your login cookie with it. This is nice and elegant, and it's how we used to do fast updates. Unfortunately, to a web browser this looks exactly like cross-site ad tracking. 😰 Recent versions of Safari try to block cross-site tracking cookies, which forces our old-style bookmarklets into "slow mode."</li>
-    <li>Send a request via JavaScript, and include a random token that we previously associated with your account. This is similar to using a login cookie (which also identifies you via something random that we gave you at some point), except that the identifier has to be embedded in the bookmarklet code itself. That adds an extra step when you're installing the bookmarklet, but it lets us go fast and <em>doesn't</em> look like ad tracking, so it works more reliably on modern browsers.</li>
-  </ul>
-
-  <p>So: As of September 2021, Eardogger's <span class="cartouche">🐶 Mark my spot</span> bookmarklet uses an embedded token, and we create a fresh token for each new copy of the bookmarklet you generate. A token lets the bookmarklet act like it's logged in as you, but only in limited ways. (Specifically, it can only <em>update</em> your dogears; it can't even list them.)</p>
+  <p>When you generate a personal <span class="cartouche">🐶 Mark my spot</span> bookmarklet, we generate some secret random text (a token) and associate it with your account. The bookmarklet sends that text when marking a URL, which lets us know whose dogears to update without requiring you to leave your current page. Basically the token lets the bookmarklet act like it's logged in as you, but only in limited ways. (It can only be used to <em>update</em> your dogears; it can't even list them.)</p>
 </div>
 
 <p>If you generated some bookmarketlets that you aren't using anymore, you can revoke their tokens. If you accidentally revoke a token that's still in use, that bookmarklet will keep working but will switch to slow mode. You can <a href="/install">generate a new one</a> to enable fast updates again.</p>
