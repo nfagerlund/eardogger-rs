@@ -22,7 +22,7 @@ This is a full rewrite (2024) of the original (https://github.com/nfagerlund/ear
 
 ## Infrastructure and operations
 
-What I learned from the first four years of Eardogger was that you always want to write down your prod infrastructure layout in the first place you'll look for it. A bunch of it feels like oversharing, but... you'd need to be able to log in as me in several places to mess with me. 🤷🏽
+Pro-tip for the forgetful and distracted: always write down your prod infrastructure layout in the first place you'll look for it. A bunch of this feels like oversharing, but... you'd need to be able to log in as me in several places to mess with me, so 🤷🏽
 
 ### General
 
@@ -41,18 +41,21 @@ Make sure your lappy's rust environment can cross-compile for `x86_64-unknown-li
 
 - `./release.sh` (build and tar some stuff)
 - `scp eardogger-release.tar.gz nfagerlund@nfagerlund.net:~/`
-- SSH in and cd to the **datadir** (not the web dir).
-    - `tar -xzf ../eardogger-release.tar.gz`
-        - — you wanna unzip in-place so you get updated `public/` and example files and stuff.
-    - `./eardogger-rs --check` to validate config and check migrations.
-    - `./eardogger-rs --migrate` if there's migrations.
-        - If the migrations are somehow _fucked_ instead of just behind, you'll need the `sqlx migrate` command (not included, but you can `cargo install` it and it's already available for the nfagerlund DH server user).
-    - `cp eardogger-rs ~/bin/`
-    - `killall eardogger-rs`
+- `ssh nfagerlund@nfagerlund.net`
+- `cd eardogger-prod-datadir`
+- `tar -xzf ../eardogger-release.tar.gz`
+    - — you wanna unzip in-place for updated `public/` and example files and stuff.
+- `./eardogger-rs --check` to validate config and check migrations.
+- `./eardogger-rs --migrate` if there's migrations.
+    - If the migrations are somehow _fucked_ instead of just behind, you'll need the `sqlx migrate` command (not included, but you can `cargo install` it and it's already available for the nfagerlund DH server user).
+- `cp eardogger-rs ~/bin/`
+- `killall eardogger-rs`
+
+Something to keep an eye on: On my first prod deploy, I was having a bit of trouble writing over `~/bin/eardogger-rs` because it was in-use. Depending on the amount of traffic, I might need to tweak the deploy process to do something like (redirect .htaccess to binary in datadir) -> killall -> (cp over the version in `~/bin`) -> (update .htaccess again) -> killall. 🤨
 
 ### Historical
 
-See [the eardogger v1 README](https://github.com/nfagerlund/eardogger/).
+See [the eardogger v1 README](https://github.com/nfagerlund/eardogger/). As of June 2024, the fly.io app configs are still present but are scaled to 0 instances, and their reserved ipv4s are released. The Neon databases are still present, but nothing should be accessing them; I should probably get around to wasting those at some point.
 
 ### Prod
 
@@ -80,7 +83,7 @@ See [the eardogger v1 README](https://github.com/nfagerlund/eardogger/).
     - Dedicated buckets and write-only app keys for prod and dev.
     - Server-side encrypt at rest.
     - Rolling window for file version lifetimes; currently 6mo for monthly and 30d for daily.
-    - There's Terraform code for the B2 bucket + key objects, but it's purely local on my machine, stored at `tf-eardogger2-b2-backups`.
+    - There's Terraform code for the B2 bucket + key objects, but it's purely local on my machine, stored at `tf-eardogger2-b2-backups`. The app key for provisioning is set to expire eventually, but you can just make a new one in the b2 UI.
     - Cron output gets emailed to a predictably named mailbox on my personal domain, can be viewed w/ DH webmail... but I wanna come up with a dead-man's switch thing to give me weekly summaries as a json-feed. Next project, codename: GRAVES.
 
 ### Dev/soak
