@@ -56,26 +56,51 @@ See [the eardogger v1 README](https://github.com/nfagerlund/eardogger/).
 
 ### Prod
 
-TBA. we're still finalizing the soak test over here.
+- https://eardogger.com!
+- Hosting: It's on my DreamHost shared hosting, tied to the nfagerlund server user.
+    - I'm not posting the global DreamHost "panel" account name publicly here, as that's a bit more sensitive. (If someone has to get in to maintain the site after something happens to me, well... hopefully you've gotten access to my password vault; everything is in there.)
+    - Web dir: `~/eardogger.com`
+        - The `.htaccess` file is where the magic happens.
+            - This also has the "no www." rule.
+        - Also, a mandatory `index.html` file. (Only shown during downtime, but also it prevents DH from showing a placeholder page.)
+    - Data/config: `~/eardogger-prod-datadir`
+        - DB: eardogger.db
+    - App logs: `~/logs-eardogger-prod`
+        - Apache logs are in `~/logs/eardogger.com`
+- DNS: Dreamhost.
+    - Registration for eardogger.com is thru Hover, but it's pointed at DH's DNS servers.
+    - There's still rules in Hover to point at the old fly.io allocation, but they're inert as long as we're not using Hover's nameservers.
+- TLS: DreamHost / Let's Encrypt
+    - Configured through the DH panel.
+- Monitoring: uptimerobot on a 30m interval.
+- Backups: Daily and monthly cron jobs to send backups to Backblaze B2.
+    - `crontab -e` to configure
+    - Scripts are in `~/cronbin`
+    - Bucket names are considered a secret, since I don't want randos slammin' em (even though they're set to allPrivate).
+    - Dedicated buckets and write-only app keys for prod and dev.
+    - Server-side encrypt at rest.
+    - Rolling window for file version lifetimes; currently 6mo for monthly and 30d for daily.
+    - There's Terraform code for the B2 bucket + key objects, but it's purely local on my machine, stored at `tf-eardogger2-b2-backups`.
+    - Cron output gets emailed to a predictably named mailbox on my personal domain, can be viewed w/ DH webmail... but I wanna come up with a dead-man's switch thing to give me weekly summaries as a json-feed. Next project, codename: GRAVES.
 
 ### Dev/soak
 
 - https://eardogger-dev.nfagerlund.net/
-- Hosting: It's on my DreamHost shared hosting, tied to the nfagerlund server user. I'm not posting the global DreamHost "panel" account name publicly here, as that's a bit more sensitive. (If someone has to get in to maintain the site after something happens to me, well... hopefully you've gotten access to my password vault; everything is in there.)
+- Hosting: DreamHost, under the nfagerlund server user.
     - Web dir: `~/eardogger-dev.nfagerlund.net`.
-        - This only contains the `.htaccess` file, plus a mandatory `index.html` file. (This never gets shown, but it prevents DH from showing a placeholder page.)
+        - `.htaccess` file, plus mandatory `index.html`.
         - **To put the dev server to sleep** when not actively developing on it, you can comment out the relevant `.htaccess` bits.
     - Data/config: `~/eardogger-dev-datadir`
         - This includes the database file!
     - App logs: `~/logs-eardogger-dev`
         - Apache logs are in `~/logs/eardogger-dev.nfagerlund.net`,
 - DNS: DreamHost.
-    - The registration for the main nfagerlund.net domain is through Hover, but it's configured to use DreamHost's DNS servers. DreamHost's "sites" panel can configure new subdomains for a domain that's already aimed at it, so that's what's up there.
+    - The registration for the main nfagerlund.net domain is through Hover, but it's configured to use DreamHost's DNS servers.
+    - DreamHost's "sites" panel can configure new subdomains for a domain that's already aimed at it.
 - TLS: DreamHost / Let's Encrypt
-    - This is configured through the DH panel.
-    - I might need to do something funky for prod in order to bounce the "www" subdomain back to eardogger.com... keep an eye on this. With v1 on fly.io, I ended up needing a separate Let's Encrypt cert for that, lol.
+    - Configured through the DH panel.
 - Monitoring: None.
-- Backups: None, but I'm gonna need it for prod.
+- Backups: Turned off, but there's a commented-out cron script for it.
 
 ## Run-time stuff
 
