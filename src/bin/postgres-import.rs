@@ -2,14 +2,14 @@
 //! and an eardogger 2 sqlite database.
 //!
 //! - Both databases are expected to be in a working condition! You need to
-//! run all your migrations or whatever out of band before trying this.
+//!   run all your migrations or whatever out of band before trying this.
 //!
 //! - We preserve users, tokens, and dogears. We don't preserve login sessions,
-//! so everyone will have to log in again after cutting over to the new (or old)
-//! instance.
+//!   so everyone will have to log in again after cutting over to the new (or old)
+//!   instance.
 //!
 //! - We don't preserve numeric IDs for objects. We DO rely on uniqueness
-//! constraints on usernames and (prefix, userid) tuples.
+//!   constraints on usernames and (prefix, userid) tuples.
 
 use futures_util::stream::TryStreamExt;
 use lazy_static::lazy_static;
