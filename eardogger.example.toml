@@ -13,15 +13,33 @@
 # Whether we're running in production or not. Affects verbosity of 500 errors.
 production = false
 
-# How many OS worker threads the Tokio runtime will use. By default,
-# tokio will use "the number of cores available to the system," which
-# *it's possible* your web host will hate. Must be > 0.
+# About threads: YES, SORRY FUTURE SELF, making these into manual twiddles
+# instead of using a heuristic is fiddly bullshit. However: By default,
+# tokio will soak up "the number of cores available to the system" for
+# its worker threads, which is ludicrous and is likely to provoke the
+# ire of your web host. (Which might even turn out to be YOU, future self!)
+# So there's no way around having to make decisions about resourcing, and
+# there's no heuristic that's guaranteed to work well for both shared
+# and dedicated hosting with all possible levels of traffic.
+#
+# In addition to these settings, keep in mind there's always one
+# additional thread each for:
+#
+# - The main thread
+# - The singleton DB writer
+# - The singleton logfile appender
+#
+# For the smoothest flavor, ensure (runtime_threads + reader_threads + 3?)
+# is ≤ your number of virtual CPU cores. Anyway, assuming you don't hit a
+# cgroup resource cap or send the OS into thrash with excessive thread
+# park/wake traffic, these thread counts will be the limiting factor for
+# how much parallel traffic the app can *actually* field. Possibly a
+# load test is in order one of these days.
+
+# How many OS threads the Tokio runtime will use for workers. Must be > 0.
 runtime_threads = 4
 
-# How many DB reader threads to cap out at. Must be > 0. This is _in addition_
-# to the Tokio runtime threads. Also, there's always one additional thread for
-# the DB writer. For best results, ensure (runtime_threads + reader_threads + 1)
-# is ≤ the number of virtual CPU cores in your system.
+# How many DB reader threads to cap out at. Must be > 0.
 reader_threads = 2
 
 # Whether to check the integrity of database migrations on every startup.
@@ -31,6 +49,8 @@ validate_migrations = true
 
 # The site's own public-facing base URL.
 public_url = "http://localhost:3000"
+
+# Locations of important files.
 db_file = "dev.db"
 assets_dir = "public"
 key_file = "cookie_key.bin"
