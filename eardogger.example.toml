@@ -13,6 +13,17 @@
 # Whether we're running in production or not. Affects verbosity of 500 errors.
 production = false
 
+# How many OS worker threads the Tokio runtime will use. By default,
+# tokio will use "the number of cores available to the system," which
+# *it's possible* your web host will hate. Must be > 0.
+runtime_threads = 4
+
+# How many DB reader threads to cap out at. Must be > 0. This is _in addition_
+# to the Tokio runtime threads. Also, there's always one additional thread for
+# the DB writer. For best results, ensure (runtime_threads + reader_threads + 1)
+# is ≤ the number of virtual CPU cores in your system.
+reader_threads = 2
+
 # Whether to check the integrity of database migrations on every startup.
 # If migrations are behind or corrupt, the app will exit instead of
 # potentially messing up user data.

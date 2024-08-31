@@ -62,6 +62,15 @@ pub struct LogFileConfig {
 pub struct DogConfig {
     /// Whether we're running in production or not. Masks 500 error details when true.
     pub production: bool,
+    /// How many OS worker threads the Tokio runtime will use. By default,
+    /// tokio will use "the number of cores available to the system," which
+    /// *it's possible* your web host will hate. Must be > 0.
+    pub runtime_threads: usize,
+    /// How many DB reader threads to cap out at. Must be > 0. This is _in addition_
+    /// to the Tokio runtime threads. Also, there's always one additional thread for
+    /// the DB writer. For best results, ensure (runtime_threads + reader_threads + 1)
+    /// is ≤ the number of virtual CPU cores in your system.
+    pub reader_threads: u32,
     /// Whether to serve in FastCGI or HTTP mode, with mode-specific settings embedded.
     pub mode: ServeMode,
     /// Whether to check the integrity of database migrations before continuing
@@ -85,6 +94,8 @@ pub struct DogConfig {
 #[derive(Debug, Deserialize)]
 struct PreDogConfig {
     production: bool,
+    runtime_threads: usize,
+    reader_threads: u32,
     mode: ServeMode,
     validate_migrations: bool,
     public_url: String,
@@ -100,6 +111,8 @@ impl PreDogConfig {
         // Destructure yourself
         let Self {
             production,
+            runtime_threads,
+            reader_threads,
             mode,
             validate_migrations,
             public_url,
@@ -122,6 +135,8 @@ impl PreDogConfig {
         }
         Ok(DogConfig {
             production,
+            runtime_threads,
+            reader_threads,
             mode,
             validate_migrations,
             public_url,
@@ -149,8 +164,13 @@ impl DogConfig {
 
     #[cfg(test)]
     pub fn test_config() -> anyhow::Result<Self> {
+        // Ignoring the one writer thread...
+        let max_threads = usize::from(std::thread::available_parallelism()?).clamp(2, 10);
+
         let pre = PreDogConfig {
             production: false,
+            runtime_threads: max_threads / 2,
+            reader_threads: (max_threads as u32) / 2,
             mode: ServeMode::Http { port: 443 },
             validate_migrations: false,
             public_url: "http://eardogger.com".to_string(),
