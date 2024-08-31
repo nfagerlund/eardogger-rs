@@ -31,7 +31,7 @@ anyhow = "1.0.79"
 thiserror = "1.0.58"
 regex = "1.10.3"
 lazy_static = "1.4.0"
-time = { version = "0.3.34", features = ["serde"] }
+time = { version = "0.3.36", features = ["serde"] }
 
 # Tracing:
 tracing = "0.1.40"
