@@ -31,10 +31,9 @@ use tracing_subscriber::{
 use crate::app::{eardogger_app, load_templates, state::*};
 use crate::config::*;
 
-const MAX_DB_READER_THREADS: u32 = 20;
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+// Only responsible for spinning up the runtime and spawning real_main
+// on it... but in order to do that, we need our args and config.
+fn main() -> anyhow::Result<()> {
     // Get args
     let options = args::cli_options();
     if options.version {
@@ -44,11 +43,24 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Get the config
-    let config = match options.config {
+    let config = match &options.config {
         Some(path) => DogConfig::load(path)?,
         None => DogConfig::load("eardogger.toml")?,
     };
 
+    // Build the runtime
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(config.runtime_threads)
+        .enable_all()
+        .build()?;
+
+    // Blast off
+    runtime.block_on(real_main(options, config))
+}
+
+// NOW we can get the party started! This is the primary future we spawn on the
+// async runtime.
+async fn real_main(options: args::Options, config: DogConfig) -> anyhow::Result<()> {
     // Set up tracing
 
     // A Registry subscriber is a hairball of a type that grows more fuzz
@@ -93,14 +105,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Set up the database connection pool
     debug!("using db file at {:?}", &config.db_file);
-    let cores = std::thread::available_parallelism()?.get() as u32;
-    // This is a low-traffic service running on shared hardware, so go easy on parallelism.
-    // Up to (cores - 2) threads, with a minimum of 2 and a cap at something silly.
-    let max_readers = cores.saturating_sub(2).max(2).min(MAX_DB_READER_THREADS);
-    debug!(
-        "{} cores available, limiting db reader threads to {}",
-        cores, max_readers
-    );
+    let max_readers = config.reader_threads;
     let read_pool = db_pool(&config.db_file, max_readers).await?;
     let write_pool = db_pool(&config.db_file, 1).await?;
     let db = Db::new(read_pool, write_pool, tracker.clone());
